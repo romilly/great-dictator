@@ -89,6 +89,7 @@
         <div class="menu-item">
             <button id="fileMenuBtn">File</button>
             <div class="dropdown" id="fileDropdown">
+                <button id="clear">Clear</button>
                 <button id="copy">Copy</button>
                 <button id="save">Save</button>
                 <button id="saveAs">Save As</button>
@@ -113,19 +114,22 @@
 
     <script>
         let mediaRecorder;
-        let audioChunks = [];
+        let currentStream;
+        const CHUNK_INTERVAL = 3000; // Send chunks every 3 seconds
 
         const recordBtn = document.getElementById('record');
         const stopBtn = document.getElementById('stop');
         const statusEl = document.getElementById('status');
         const transcriptionEl = document.getElementById('transcription');
         const micSelect = document.getElementById('micSelect');
+        const clearBtn = document.getElementById('clear');
         const copyBtn = document.getElementById('copy');
         const saveBtn = document.getElementById('save');
         const saveAsBtn = document.getElementById('saveAs');
         const fileMenuBtn = document.getElementById('fileMenuBtn');
         const fileDropdown = document.getElementById('fileDropdown');
 
+        // File menu handling
         fileMenuBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             fileDropdown.classList.toggle('open');
@@ -137,7 +141,6 @@
 
         async function loadAudioDevices() {
             try {
-                // Request permission first to get device labels
                 await navigator.mediaDevices.getUserMedia({ audio: true })
                     .then(stream => stream.getTracks().forEach(track => track.stop()));
 
@@ -163,6 +166,24 @@
 
         loadAudioDevices();
 
+        async function transcribeChunk(audioBlob) {
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'chunk.webm');
+
+            try {
+                const response = await fetch('/transcribe', {
+                    method: 'POST',
+                    body: formData
+                });
+                const text = await response.text();
+                if (text.trim()) {
+                    transcriptionEl.value += text + ' ';
+                }
+            } catch (error) {
+                console.error('Transcription error:', error);
+            }
+        }
+
         recordBtn.addEventListener('click', async () => {
             const deviceId = micSelect.value;
             if (!deviceId) {
@@ -171,41 +192,27 @@
             }
 
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
+                currentStream = await navigator.mediaDevices.getUserMedia({
                     audio: { deviceId: { exact: deviceId } }
                 });
-                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
-                audioChunks = [];
+                mediaRecorder = new MediaRecorder(currentStream, { mimeType: 'audio/webm;codecs=opus' });
 
-                mediaRecorder.ondataavailable = (event) => {
-                    audioChunks.push(event.data);
-                };
-
-                mediaRecorder.onstop = async () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    const formData = new FormData();
-                    formData.append('audio', audioBlob, 'recording.webm');
-
-                    statusEl.textContent = 'Transcribing...';
-                    try {
-                        const response = await fetch('/transcribe', {
-                            method: 'POST',
-                            body: formData
-                        });
-                        const html = await response.text();
-                        transcriptionEl.value += html + '\n';
-                        statusEl.textContent = 'Done';
-                    } catch (error) {
-                        statusEl.textContent = 'Error: ' + error.message;
+                mediaRecorder.ondataavailable = async (event) => {
+                    if (event.data.size > 0) {
+                        // Send chunk for transcription (don't await - let it run in background)
+                        transcribeChunk(event.data);
                     }
-
-                    stream.getTracks().forEach(track => track.stop());
                 };
 
-                mediaRecorder.start();
+                mediaRecorder.onstop = () => {
+                    currentStream.getTracks().forEach(track => track.stop());
+                };
+
+                // Start recording with timeslice - fires ondataavailable every CHUNK_INTERVAL ms
+                mediaRecorder.start(CHUNK_INTERVAL);
                 recordBtn.disabled = true;
                 stopBtn.disabled = false;
-                statusEl.textContent = 'Recording...';
+                statusEl.textContent = 'Recording... (transcribing every 3s)';
             } catch (error) {
                 statusEl.textContent = 'Error: ' + error.message;
             }
@@ -216,6 +223,7 @@
                 mediaRecorder.stop();
                 recordBtn.disabled = false;
                 stopBtn.disabled = true;
+                statusEl.textContent = 'Done';
             }
         });
 
@@ -228,6 +236,12 @@
             a.click();
             URL.revokeObjectURL(url);
         }
+
+        clearBtn.addEventListener('click', () => {
+            transcriptionEl.value = '';
+            statusEl.textContent = 'Cleared';
+            fileDropdown.classList.remove('open');
+        });
 
         copyBtn.addEventListener('click', async () => {
             await navigator.clipboard.writeText(transcriptionEl.value);

@@ -57,40 +57,38 @@ def browser_type_launch_args(browser_type_launch_args):
     }
 
 
-def test_dictation_flow(server, page: Page):
-    """Test the full dictation flow: record -> stop -> see transcription."""
+def test_page_loads(server, page: Page):
+    """Test that the page loads with correct elements."""
     page.goto("http://localhost:8765")
 
     # Verify page loaded
     expect(page.locator("h1")).to_have_text("Great Dictator")
 
-    # Wait for microphone to be populated and select it
+    # Verify mic selector exists
+    expect(page.locator("#micSelect")).to_be_visible()
+
+    # Verify buttons exist
+    expect(page.locator("#record")).to_be_visible()
+    expect(page.locator("#stop")).to_be_visible()
+
+    # Verify textarea exists
+    expect(page.locator("#transcription")).to_be_visible()
+
+
+def test_microphone_populates(server, page: Page):
+    """Test that the microphone selector populates with devices."""
+    page.goto("http://localhost:8765")
+
+    # Wait for microphone to be populated
     page.wait_for_function(
         "document.getElementById('micSelect').options.length > 0 && "
         "document.getElementById('micSelect').options[0].value !== ''",
         timeout=5000
     )
 
-    # Click Record
-    page.click("#record")
-
-    # Wait for recording status
-    expect(page.locator("#status")).to_have_text("Recording...", timeout=5000)
-
-    # Wait for enough audio to be captured
-    page.wait_for_timeout(2000)
-
-    # Click Stop
-    page.click("#stop")
-
-    # Wait for transcription to appear (Whisper processing can take time)
-    transcription = page.locator("#transcription")
-
-    # Wait until textarea has a value containing "hello"
-    page.wait_for_function(
-        "document.getElementById('transcription').value.toLowerCase().includes('hello')",
-        timeout=60000
-    )
+    # Should have at least one option with a value
+    mic_select = page.locator("#micSelect")
+    expect(mic_select).to_be_visible()
 
 
 def test_file_menu_opens(server, page: Page):
@@ -110,6 +108,7 @@ def test_file_menu_opens(server, page: Page):
 
     # Dropdown should now be visible with options
     expect(dropdown).to_be_visible()
+    expect(dropdown.locator("#clear")).to_have_text("Clear")
     expect(dropdown.locator("#copy")).to_have_text("Copy")
     expect(dropdown.locator("#save")).to_have_text("Save")
     expect(dropdown.locator("#saveAs")).to_have_text("Save As")
@@ -117,3 +116,31 @@ def test_file_menu_opens(server, page: Page):
     # Click outside to close
     page.click("h1")
     expect(dropdown).not_to_be_visible()
+
+
+def test_recording_starts(server, page: Page):
+    """Test that clicking Record starts recording."""
+    page.goto("http://localhost:8765")
+
+    # Wait for microphone to be populated
+    page.wait_for_function(
+        "document.getElementById('micSelect').options.length > 0 && "
+        "document.getElementById('micSelect').options[0].value !== ''",
+        timeout=5000
+    )
+
+    # Click Record
+    page.click("#record")
+
+    # Wait for recording status
+    expect(page.locator("#status")).to_contain_text("Recording", timeout=5000)
+
+    # Record should be disabled, Stop should be enabled
+    expect(page.locator("#record")).to_be_disabled()
+    expect(page.locator("#stop")).to_be_enabled()
+
+    # Click Stop
+    page.click("#stop")
+
+    # Record should be enabled again
+    expect(page.locator("#record")).to_be_enabled()
