@@ -20,6 +20,12 @@
         #record { background: #4CAF50; color: white; border: none; }
         #stop { background: #f44336; color: white; border: none; }
         #stop:disabled { background: #ccc; }
+        select {
+            padding: 8px;
+            font-size: 14px;
+            margin-bottom: 10px;
+            width: 100%;
+        }
         textarea {
             width: 100%;
             height: 200px;
@@ -28,10 +34,19 @@
             font-size: 16px;
         }
         #status { margin-top: 10px; color: #666; }
+        label { font-weight: bold; }
     </style>
 </head>
 <body>
     <h1>Great Dictator</h1>
+
+    <div>
+        <label for="micSelect">Microphone:</label>
+        <select id="micSelect">
+            <option value="">Loading devices...</option>
+        </select>
+    </div>
+
     <div>
         <button id="record">Record</button>
         <button id="stop" disabled>Stop</button>
@@ -47,10 +62,47 @@
         const stopBtn = document.getElementById('stop');
         const statusEl = document.getElementById('status');
         const transcriptionEl = document.getElementById('transcription');
+        const micSelect = document.getElementById('micSelect');
+
+        async function loadAudioDevices() {
+            try {
+                // Request permission first to get device labels
+                await navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(stream => stream.getTracks().forEach(track => track.stop()));
+
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const audioInputs = devices.filter(d => d.kind === 'audioinput');
+
+                micSelect.innerHTML = '';
+                audioInputs.forEach((device, index) => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.textContent = device.label || `Microphone ${index + 1}`;
+                    micSelect.appendChild(option);
+                });
+
+                if (audioInputs.length === 0) {
+                    micSelect.innerHTML = '<option value="">No microphones found</option>';
+                }
+            } catch (error) {
+                micSelect.innerHTML = '<option value="">Error loading devices</option>';
+                statusEl.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        loadAudioDevices();
 
         recordBtn.addEventListener('click', async () => {
+            const deviceId = micSelect.value;
+            if (!deviceId) {
+                statusEl.textContent = 'Please select a microphone';
+                return;
+            }
+
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: { deviceId: { exact: deviceId } }
+                });
                 mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
                 audioChunks = [];
 
