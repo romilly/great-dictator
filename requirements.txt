@@ -1,4 +1,7 @@
 # Production dependencies
-# Add your dependencies here
+faster-whisper
+fastapi
+uvicorn[standard]
+python-multipart
 
 # Development dependencies are in requirements-test.txt

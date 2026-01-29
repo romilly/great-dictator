@@ -4,3 +4,7 @@ pytest
 coverage
 pyright
 PyHamcrest
+pytest-asyncio
+httpx
+playwright
+pytest-playwright
