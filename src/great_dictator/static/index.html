@@ -115,7 +115,9 @@
     <script>
         let mediaRecorder;
         let currentStream;
-        const CHUNK_INTERVAL = 3000; // Send chunks every 3 seconds
+        let audioChunks = [];
+        let lastTranscribedLength = 0;
+        const CHUNK_INTERVAL = 3000; // Transcribe every 3 seconds
 
         const recordBtn = document.getElementById('record');
         const stopBtn = document.getElementById('stop');
@@ -166,9 +168,12 @@
 
         loadAudioDevices();
 
-        async function transcribeChunk(audioBlob) {
+        async function transcribeAccumulated() {
+            // Create blob from all chunks so far
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+
             const formData = new FormData();
-            formData.append('audio', audioBlob, 'chunk.webm');
+            formData.append('audio', audioBlob, 'recording.webm');
 
             try {
                 const response = await fetch('/transcribe', {
@@ -177,7 +182,8 @@
                 });
                 const text = await response.text();
                 if (text.trim()) {
-                    transcriptionEl.value += text + ' ';
+                    // Replace transcription with new full text
+                    transcriptionEl.value = text;
                 }
             } catch (error) {
                 console.error('Transcription error:', error);
@@ -192,6 +198,7 @@
             }
 
             try {
+                audioChunks = [];  // Reset chunks
                 currentStream = await navigator.mediaDevices.getUserMedia({
                     audio: { deviceId: { exact: deviceId } }
                 });
@@ -199,13 +206,18 @@
 
                 mediaRecorder.ondataavailable = async (event) => {
                     if (event.data.size > 0) {
-                        // Send chunk for transcription (don't await - let it run in background)
-                        transcribeChunk(event.data);
+                        audioChunks.push(event.data);
+                        // Transcribe accumulated audio
+                        transcribeAccumulated();
                     }
                 };
 
                 mediaRecorder.onstop = () => {
                     currentStream.getTracks().forEach(track => track.stop());
+                    // Final transcription
+                    if (audioChunks.length > 0) {
+                        transcribeAccumulated();
+                    }
                 };
 
                 // Start recording with timeslice - fires ondataavailable every CHUNK_INTERVAL ms
