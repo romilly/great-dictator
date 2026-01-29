@@ -2,6 +2,10 @@
 
 A browser-based dictation engine for workstation or phone.
 
+In early (alpha) development, but already usable and fun!
+
+
+
 ## Features
 
 - Browser-based audio recording using MediaRecorder API
