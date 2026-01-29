@@ -35,9 +35,66 @@
         }
         #status { margin-top: 10px; color: #666; }
         label { font-weight: bold; }
+        .menu-bar {
+            background: #f0f0f0;
+            border-bottom: 1px solid #ccc;
+            margin: -20px -20px 20px -20px;
+            padding: 0;
+        }
+        .menu-item {
+            position: relative;
+            display: inline-block;
+        }
+        .menu-item > button {
+            background: none;
+            border: none;
+            padding: 8px 16px;
+            margin: 0;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .menu-item > button:hover {
+            background: #e0e0e0;
+        }
+        .dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            border: 1px solid #ccc;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+            min-width: 150px;
+            z-index: 100;
+        }
+        .dropdown.open { display: block; }
+        .dropdown button {
+            display: block;
+            width: 100%;
+            text-align: left;
+            background: none;
+            border: none;
+            padding: 8px 16px;
+            margin: 0;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .dropdown button:hover {
+            background: #e8e8e8;
+        }
     </style>
 </head>
 <body>
+    <div class="menu-bar">
+        <div class="menu-item">
+            <button id="fileMenuBtn">File</button>
+            <div class="dropdown" id="fileDropdown">
+                <button id="copy">Copy</button>
+                <button id="save">Save</button>
+                <button id="saveAs">Save As</button>
+            </div>
+        </div>
+    </div>
     <h1>Great Dictator</h1>
 
     <div>
@@ -63,6 +120,20 @@
         const statusEl = document.getElementById('status');
         const transcriptionEl = document.getElementById('transcription');
         const micSelect = document.getElementById('micSelect');
+        const copyBtn = document.getElementById('copy');
+        const saveBtn = document.getElementById('save');
+        const saveAsBtn = document.getElementById('saveAs');
+        const fileMenuBtn = document.getElementById('fileMenuBtn');
+        const fileDropdown = document.getElementById('fileDropdown');
+
+        fileMenuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            fileDropdown.classList.toggle('open');
+        });
+
+        document.addEventListener('click', () => {
+            fileDropdown.classList.remove('open');
+        });
 
         async function loadAudioDevices() {
             try {
@@ -145,6 +216,37 @@
                 mediaRecorder.stop();
                 recordBtn.disabled = false;
                 stopBtn.disabled = true;
+            }
+        });
+
+        function downloadFile(content, filename) {
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        copyBtn.addEventListener('click', async () => {
+            await navigator.clipboard.writeText(transcriptionEl.value);
+            statusEl.textContent = 'Copied to clipboard';
+            fileDropdown.classList.remove('open');
+        });
+
+        saveBtn.addEventListener('click', () => {
+            downloadFile(transcriptionEl.value, 'transcription.txt');
+            statusEl.textContent = 'Saved as transcription.txt';
+            fileDropdown.classList.remove('open');
+        });
+
+        saveAsBtn.addEventListener('click', () => {
+            fileDropdown.classList.remove('open');
+            const filename = prompt('Enter filename:', 'transcription.txt');
+            if (filename) {
+                downloadFile(transcriptionEl.value, filename);
+                statusEl.textContent = `Saved as ${filename}`;
             }
         });
     </script>

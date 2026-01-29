@@ -7,6 +7,7 @@ A browser-based dictation engine for workstation or phone.
 - Browser-based audio recording using MediaRecorder API
 - Speech-to-text transcription using faster-whisper
 - Simple web interface with Record/Stop controls
+- File menu for managing transcriptions (Copy, Save, Save As)
 - Hexagonal architecture for clean separation of concerns
 
 ## Architecture
