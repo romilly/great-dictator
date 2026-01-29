@@ -60,10 +60,10 @@ Implemented the walking skeleton for great-dictator - a browser-based dictation 
 
 ## Test Results
 
-All 5 tests passing:
+All 8 tests passing:
 - 1 unit test
 - 3 integration tests
-- 1 E2E test
+- 4 E2E tests
 
 Type checking: 0 errors (pyright)
 
@@ -72,3 +72,32 @@ Type checking: 0 errors (pyright)
 - Test audio file generated using gTTS ("hello world")
 - E2E test uses Playwright's fake media stream with `--use-file-for-fake-audio-capture`
 - API tests use Starlette's sync TestClient to avoid event loop conflicts with Playwright
+
+---
+
+## Update: Test Server Management
+
+### Problem Solved
+- Tests used same port (8765) as manual testing, causing conflicts
+- Server processes could become orphaned on test failures
+
+### Changes Made
+
+**`tests/e2e/conftest.py`** (new)
+- Server fixture moved here for cleaner test files
+- Uses port 8766 (separate from dev server on 8765)
+- `managed_server()` context manager with proper cleanup:
+  - 5 second graceful termination timeout
+  - Force kill if still running
+- `server_url` fixture for easy URL access
+
+**`tests/e2e/test_dictation_flow.py`** (simplified)
+- Removed fixture definitions (now in conftest)
+- Uses `server_url` fixture instead of hardcoded port
+
+**`scripts/dev-server.sh`** (new)
+- Convenience script for manual testing
+- Runs on port 8765 with hot reload
+
+### Next Steps
+- Authentication and authorisation

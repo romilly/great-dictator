@@ -47,10 +47,17 @@ pip install -e .
 
 ```bash
 source venv/bin/activate
+./scripts/dev-server.sh
+```
+
+Or manually:
+```bash
 uvicorn great_dictator.app:app --reload --port 8765
 ```
 
 Then open http://localhost:8765 in your browser.
+
+**Note:** Dev server uses port 8765, E2E tests use port 8766 to avoid conflicts.
 
 ## Development
 
@@ -91,7 +98,12 @@ src/great_dictator/
 tests/
 ├── unit/                           # Domain layer tests
 ├── integration/                    # Adapter tests
-└── e2e/                            # Playwright browser tests
+└── e2e/
+    ├── conftest.py                 # Server fixtures (port 8766)
+    └── test_dictation_flow.py      # Playwright browser tests
+
+scripts/
+└── dev-server.sh                   # Dev server launcher (port 8765)
 ```
 
 ## License
