@@ -4,5 +4,6 @@ fastapi
 uvicorn[standard]
 python-multipart
 python-dotenv
+jinja2
 
 # Development dependencies are in requirements-test.txt

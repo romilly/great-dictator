@@ -1,0 +1,10 @@
+{% if documents %}
+{% for doc_id, name, created in documents %}
+<li hx-get="/editor/load/{{ doc_id }}" hx-target="#editor-area" hx-swap="innerHTML">
+    <div class="doc-name">{{ name }}</div>
+    <div class="doc-date">{{ created.strftime('%Y-%m-%d %H:%M') }}</div>
+</li>
+{% endfor %}
+{% else %}
+<li style="color: #666; cursor: default;">No documents found</li>
+{% endif %}

@@ -24,7 +24,8 @@ def test_index_returns_html_page(client):
     assert_that(response.text, contains_string("<html"))
 
 
-def test_transcribe_returns_html_fragment(client, fake_transcriber):
+def test_transcribe_returns_text(client, fake_transcriber):
+    """Basic transcribe endpoint returns plain text."""
     audio_content = b"fake audio data"
     files = {"audio": ("test.webm", audio_content, "audio/webm")}
 
@@ -33,3 +34,24 @@ def test_transcribe_returns_html_fragment(client, fake_transcriber):
     assert_that(response.status_code, equal_to(200))
     assert_that(response.text, contains_string("fake transcription"))
     assert fake_transcriber.last_audio is not None
+
+
+def test_transcribe_htmx_returns_editor_fragment(client, fake_transcriber):
+    """Transcribe with htmx header returns editor fragment with transcription."""
+    audio_content = b"fake audio data"
+    files = {"audio": ("test.webm", audio_content, "audio/webm")}
+    # Add current content to be preserved/appended to
+    data = {"existingContent": "Previous text. "}
+
+    response = client.post(
+        "/transcribe",
+        files=files,
+        data=data,
+        headers={"HX-Request": "true"},
+    )
+
+    assert_that(response.status_code, equal_to(200))
+    # Should return editor fragment with combined content
+    assert_that(response.text, contains_string("Previous text."))
+    assert_that(response.text, contains_string("fake transcription"))
+    assert_that(response.text, contains_string('id="transcription"'))

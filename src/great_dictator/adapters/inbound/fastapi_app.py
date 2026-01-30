@@ -3,47 +3,15 @@ from io import BytesIO
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
+from great_dictator.adapters.inbound.templates import render_document_list, render_editor
 from great_dictator.domain.document import Document, DocumentRepositoryPort
 from great_dictator.domain.transcription import TranscriptionService
 
 STATIC_DIR = Path(__file__).parent.parent.parent / "static"
-
-
-def render_editor(
-    document_id: int | None = None,
-    document_name: str = "Untitled document",
-    content: str = "",
-    user: str = "romilly",
-) -> str:
-    """Render the editor HTML fragment for htmx responses."""
-    doc_id_value = str(document_id) if document_id else ""
-    return f"""<div id="docTitle">
-    <input type="hidden" name="documentId" id="documentId" value="{doc_id_value}">
-    <input type="hidden" name="user" value="{user}">
-    <input type="text" id="docName" name="documentName" value="{document_name}" placeholder="Document name">
-</div>
-<textarea id="transcription" name="content" placeholder="Transcription will appear here...">{content}</textarea>"""
-
-
-def render_document_list(documents: list[tuple[int, str, datetime]]) -> str:
-    """Render the document list HTML fragment for htmx responses."""
-    if not documents:
-        return '<li style="color: #666; cursor: default;">No documents found</li>'
-
-    items = []
-    for doc_id, name, created in documents:
-        date_str = created.strftime("%Y-%m-%d %H:%M")
-        items.append(
-            f'''<li hx-get="/editor/load/{doc_id}" hx-target="#editor-area" hx-swap="innerHTML">
-    <div class="doc-name">{name}</div>
-    <div class="doc-date">{date_str}</div>
-</li>'''
-        )
-    return "\n".join(items)
 
 
 class DocumentCreateRequest(BaseModel):
@@ -83,9 +51,20 @@ def create_app(
         return FileResponse(STATIC_DIR / "index.html")
 
     @app.post("/transcribe", response_class=HTMLResponse)
-    async def transcribe(audio: UploadFile = File(...)) -> str:
+    async def transcribe(
+        audio: UploadFile = File(...),
+        existingContent: Annotated[str, Form()] = "",
+        hx_request: Annotated[str | None, Header(alias="HX-Request")] = None,
+    ) -> str:
         audio_bytes = await audio.read()
         result = transcription_service.transcribe(BytesIO(audio_bytes))
+
+        # If htmx request, return editor fragment with combined content
+        if hx_request:
+            combined_content = existingContent + result.text
+            return render_editor(content=combined_content, status="Transcribed")
+
+        # Otherwise return just the text (backward compatible)
         return result.text
 
     if document_repository is not None:
@@ -159,11 +138,11 @@ def create_app(
         # htmx endpoints - return HTML fragments
         @app.post("/editor/new", response_class=HTMLResponse)
         async def editor_new() -> str:
-            return render_editor()
+            return render_editor(status="New document")
 
         @app.post("/editor/clear", response_class=HTMLResponse)
         async def editor_clear() -> str:
-            return render_editor()
+            return render_editor(status="Cleared")
 
         @app.post("/editor/save", response_class=HTMLResponse)
         async def editor_save(
@@ -185,7 +164,10 @@ def create_app(
                         created=existing.created,
                     )
                     saved = document_repository.save(doc)
-                    return render_editor(saved.id, saved.name, saved.content, saved.user)
+                    return render_editor(
+                        saved.id, saved.name, saved.content, saved.user,
+                        status=f'Saved "{saved.name}"',
+                    )
 
             # Otherwise create new document
             doc = Document(
@@ -195,14 +177,20 @@ def create_app(
                 created=datetime.now(),
             )
             saved = document_repository.save(doc)
-            return render_editor(saved.id, saved.name, saved.content, saved.user)
+            return render_editor(
+                saved.id, saved.name, saved.content, saved.user,
+                status=f'Saved "{saved.name}"',
+            )
 
         @app.get("/editor/load/{document_id}", response_class=HTMLResponse)
         async def editor_load(document_id: int) -> str:
             doc = document_repository.load(document_id)
             if doc is None:
                 raise HTTPException(status_code=404, detail="Document not found")
-            return render_editor(doc.id, doc.name, doc.content, doc.user)
+            return render_editor(
+                doc.id, doc.name, doc.content, doc.user,
+                status=f'Opened "{doc.name}"',
+            )
 
         @app.get("/documents/list-html", response_class=HTMLResponse)
         async def documents_list_html(user: str) -> str:
