@@ -12,6 +12,7 @@ In early (alpha) development, but already usable and fun!
 - Speech-to-text transcription using faster-whisper
 - Simple web interface with Record/Stop controls
 - File menu for managing transcriptions (Copy, Save, Save As)
+- Persistent document storage with SQLite
 - Hexagonal architecture for clean separation of concerns
 
 ## Architecture
@@ -24,14 +25,15 @@ In early (alpha) development, but already usable and fun!
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    Domain Layer                             │
-│         TranscriptionService ←── TranscriberPort (ABC)      │
+│                      Domain Layer                           │
+│    TranscriptionService ←── TranscriberPort (ABC)           │
+│    DocumentRepositoryPort (ABC) ←── Document, DocumentSummary│
 └──────────────────────────┬──────────────────────────────────┘
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                     Outbound Adapter                        │
-│                   (WhisperTranscriber)                      │
+│                    Outbound Adapters                        │
+│  WhisperTranscriber          SqliteDocumentRepository       │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -45,6 +47,18 @@ source venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 pip install -e .
+```
+
+## Configuration
+
+Database paths are configured via `.env` files:
+
+```bash
+# .env (production)
+DATABASE_PATH=data/documents.db
+
+# tests/.env (testing)
+DATABASE_PATH=tests/data/test_documents.db
 ```
 
 ## Running the Application
@@ -90,24 +104,31 @@ pyright src/
 src/great_dictator/
 ├── app.py                          # Composition root
 ├── domain/
-│   └── transcription.py            # Domain layer (ports & services)
+│   ├── transcription.py            # Transcription ports & services
+│   └── document.py                 # Document ports & models
 ├── adapters/
 │   ├── inbound/
 │   │   └── fastapi_app.py          # FastAPI routes
 │   └── outbound/
-│       └── whisper_transcriber.py  # Whisper implementation
+│       ├── whisper_transcriber.py  # Whisper implementation
+│       └── sqlite_document_repository.py  # SQLite storage
 └── static/
     └── index.html                  # Web UI
 
 tests/
 ├── unit/                           # Domain layer tests
 ├── integration/                    # Adapter tests
-└── e2e/
-    ├── conftest.py                 # Server fixtures (port 8766)
-    └── test_dictation_flow.py      # Playwright browser tests
+├── e2e/
+│   ├── conftest.py                 # Server fixtures (port 8766)
+│   └── test_dictation_flow.py      # Playwright browser tests
+└── data/
+    └── test_documents.db           # Test database (gitignored)
 
 scripts/
 └── dev-server.sh                   # Dev server launcher (port 8765)
+
+data/                               # Production database (gitignored)
+└── documents.db
 ```
 
 ## License
