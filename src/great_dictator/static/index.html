@@ -82,6 +82,55 @@
         .dropdown button:hover {
             background: #e8e8e8;
         }
+        .dropdown hr {
+            margin: 4px 0;
+            border: none;
+            border-top: 1px solid #ddd;
+        }
+        #docTitle {
+            color: #333;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+        }
+        .modal.open { display: flex; justify-content: center; align-items: center; }
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 400px;
+            width: 90%;
+            max-height: 80%;
+            overflow-y: auto;
+        }
+        .modal h2 { margin-top: 0; }
+        .doc-list { list-style: none; padding: 0; margin: 0; }
+        .doc-list li {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        .doc-list li:hover { background: #f5f5f5; }
+        .doc-list li .doc-name { font-weight: bold; }
+        .doc-list li .doc-date { font-size: 12px; color: #666; }
+        .modal-close {
+            float: right;
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0;
+            margin: 0;
+        }
     </style>
 </head>
 <body>
@@ -89,14 +138,19 @@
         <div class="menu-item">
             <button id="fileMenuBtn">File</button>
             <div class="dropdown" id="fileDropdown">
-                <button id="clear">Clear</button>
-                <button id="copy">Copy</button>
+                <button id="newDoc">New</button>
+                <button id="open">Open...</button>
+                <hr>
                 <button id="save">Save</button>
-                <button id="saveAs">Save As</button>
+                <button id="saveAs">Save As...</button>
+                <hr>
+                <button id="copy">Copy</button>
+                <button id="clear">Clear</button>
             </div>
         </div>
     </div>
     <h1>Great Dictator</h1>
+    <div id="docTitle">Untitled document</div>
 
     <div>
         <label for="micSelect">Microphone:</label>
@@ -112,12 +166,27 @@
     <div id="status"></div>
     <textarea id="transcription" placeholder="Transcription will appear here..."></textarea>
 
+    <div class="modal" id="openModal">
+        <div class="modal-content">
+            <button class="modal-close" id="closeModal">&times;</button>
+            <h2>Open Document</h2>
+            <ul class="doc-list" id="docList">
+                <li>Loading...</li>
+            </ul>
+        </div>
+    </div>
+
     <script>
         let mediaRecorder;
         let currentStream;
         let audioChunks = [];
         let lastTranscribedLength = 0;
-        const CHUNK_INTERVAL = 3000; // Transcribe every 3 seconds
+        const CHUNK_INTERVAL = 3000;
+
+        // Document state
+        let currentDocumentId = null;
+        let currentDocumentName = null;
+        const currentUser = 'romilly';
 
         const recordBtn = document.getElementById('record');
         const stopBtn = document.getElementById('stop');
@@ -128,8 +197,22 @@
         const copyBtn = document.getElementById('copy');
         const saveBtn = document.getElementById('save');
         const saveAsBtn = document.getElementById('saveAs');
+        const newDocBtn = document.getElementById('newDoc');
+        const openBtn = document.getElementById('open');
         const fileMenuBtn = document.getElementById('fileMenuBtn');
         const fileDropdown = document.getElementById('fileDropdown');
+        const docTitleEl = document.getElementById('docTitle');
+        const openModal = document.getElementById('openModal');
+        const closeModalBtn = document.getElementById('closeModal');
+        const docList = document.getElementById('docList');
+
+        function updateDocTitle() {
+            if (currentDocumentName) {
+                docTitleEl.textContent = currentDocumentName;
+            } else {
+                docTitleEl.textContent = 'Untitled document';
+            }
+        }
 
         // File menu handling
         fileMenuBtn.addEventListener('click', (e) => {
@@ -169,7 +252,6 @@
         loadAudioDevices();
 
         async function transcribeAccumulated() {
-            // Create blob from all chunks so far
             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
 
             const formData = new FormData();
@@ -182,7 +264,6 @@
                 });
                 const text = await response.text();
                 if (text.trim()) {
-                    // Replace transcription with new full text
                     transcriptionEl.value = text;
                 }
             } catch (error) {
@@ -198,7 +279,7 @@
             }
 
             try {
-                audioChunks = [];  // Reset chunks
+                audioChunks = [];
                 currentStream = await navigator.mediaDevices.getUserMedia({
                     audio: { deviceId: { exact: deviceId } }
                 });
@@ -207,20 +288,17 @@
                 mediaRecorder.ondataavailable = async (event) => {
                     if (event.data.size > 0) {
                         audioChunks.push(event.data);
-                        // Transcribe accumulated audio
                         transcribeAccumulated();
                     }
                 };
 
                 mediaRecorder.onstop = () => {
                     currentStream.getTracks().forEach(track => track.stop());
-                    // Final transcription
                     if (audioChunks.length > 0) {
                         transcribeAccumulated();
                     }
                 };
 
-                // Start recording with timeslice - fires ondataavailable every CHUNK_INTERVAL ms
                 mediaRecorder.start(CHUNK_INTERVAL);
                 recordBtn.disabled = true;
                 stopBtn.disabled = false;
@@ -239,15 +317,133 @@
             }
         });
 
-        function downloadFile(content, filename) {
-            const blob = new Blob([content], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            a.click();
-            URL.revokeObjectURL(url);
+        // Document operations
+        async function saveDocument(name) {
+            const content = transcriptionEl.value;
+            try {
+                const response = await fetch('/documents', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user: currentUser,
+                        name: name,
+                        content: content
+                    })
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    currentDocumentId = data.id;
+                    currentDocumentName = data.name;
+                    updateDocTitle();
+                    statusEl.textContent = `Saved as "${name}"`;
+                    return true;
+                } else {
+                    const error = await response.json();
+                    statusEl.textContent = `Error: ${error.detail || 'Failed to save'}`;
+                    return false;
+                }
+            } catch (error) {
+                statusEl.textContent = 'Error saving: ' + error.message;
+                return false;
+            }
         }
+
+        async function updateDocument() {
+            const content = transcriptionEl.value;
+            try {
+                const response = await fetch(`/documents/${currentDocumentId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user: currentUser,
+                        name: currentDocumentName,
+                        content: content
+                    })
+                });
+                if (response.ok) {
+                    statusEl.textContent = `Saved "${currentDocumentName}"`;
+                    return true;
+                } else {
+                    const error = await response.json();
+                    statusEl.textContent = `Error: ${error.detail || 'Failed to save'}`;
+                    return false;
+                }
+            } catch (error) {
+                statusEl.textContent = 'Error saving: ' + error.message;
+                return false;
+            }
+        }
+
+        async function loadDocumentList() {
+            try {
+                const response = await fetch(`/documents?user=${currentUser}`);
+                const documents = await response.json();
+
+                if (documents.length === 0) {
+                    docList.innerHTML = '<li style="color: #666; cursor: default;">No documents found</li>';
+                    return;
+                }
+
+                docList.innerHTML = '';
+                documents.forEach(doc => {
+                    const li = document.createElement('li');
+                    const date = new Date(doc.created);
+                    li.innerHTML = `
+                        <div class="doc-name">${doc.name}</div>
+                        <div class="doc-date">${date.toLocaleDateString()} ${date.toLocaleTimeString()}</div>
+                    `;
+                    li.addEventListener('click', () => loadDocument(doc.id));
+                    docList.appendChild(li);
+                });
+            } catch (error) {
+                docList.innerHTML = '<li style="color: red;">Error loading documents</li>';
+            }
+        }
+
+        async function loadDocument(id) {
+            try {
+                const response = await fetch(`/documents/${id}`);
+                if (response.ok) {
+                    const doc = await response.json();
+                    currentDocumentId = doc.id;
+                    currentDocumentName = doc.name;
+                    transcriptionEl.value = doc.content;
+                    updateDocTitle();
+                    openModal.classList.remove('open');
+                    statusEl.textContent = `Opened "${doc.name}"`;
+                } else {
+                    statusEl.textContent = 'Error loading document';
+                }
+            } catch (error) {
+                statusEl.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        newDocBtn.addEventListener('click', () => {
+            currentDocumentId = null;
+            currentDocumentName = null;
+            transcriptionEl.value = '';
+            audioChunks = [];
+            updateDocTitle();
+            statusEl.textContent = 'New document';
+            fileDropdown.classList.remove('open');
+        });
+
+        openBtn.addEventListener('click', () => {
+            fileDropdown.classList.remove('open');
+            loadDocumentList();
+            openModal.classList.add('open');
+        });
+
+        closeModalBtn.addEventListener('click', () => {
+            openModal.classList.remove('open');
+        });
+
+        openModal.addEventListener('click', (e) => {
+            if (e.target === openModal) {
+                openModal.classList.remove('open');
+            }
+        });
 
         clearBtn.addEventListener('click', () => {
             transcriptionEl.value = '';
@@ -261,18 +457,27 @@
             fileDropdown.classList.remove('open');
         });
 
-        saveBtn.addEventListener('click', () => {
-            downloadFile(transcriptionEl.value, 'transcription.txt');
-            statusEl.textContent = 'Saved as transcription.txt';
+        saveBtn.addEventListener('click', async () => {
             fileDropdown.classList.remove('open');
+            if (currentDocumentId) {
+                // Update existing document
+                await updateDocument();
+            } else {
+                // New document - prompt for name
+                const name = prompt('Document name:', 'My Document');
+                if (name) {
+                    await saveDocument(name);
+                }
+            }
         });
 
-        saveAsBtn.addEventListener('click', () => {
+        saveAsBtn.addEventListener('click', async () => {
             fileDropdown.classList.remove('open');
-            const filename = prompt('Enter filename:', 'transcription.txt');
-            if (filename) {
-                downloadFile(transcriptionEl.value, filename);
-                statusEl.textContent = `Saved as ${filename}`;
+            const name = prompt('Document name:', currentDocumentName || 'My Document');
+            if (name) {
+                // Always create a new document
+                currentDocumentId = null;
+                await saveDocument(name);
             }
         });
     </script>
