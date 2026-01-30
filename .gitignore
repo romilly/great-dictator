@@ -121,6 +121,9 @@ celerybeat-schedule
 # dotenv
 .env
 
+# SQLite databases
+*.db
+
 # virtualenv
 venv/
 ENV/

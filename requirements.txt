@@ -3,5 +3,6 @@ faster-whisper
 fastapi
 uvicorn[standard]
 python-multipart
+python-dotenv
 
 # Development dependencies are in requirements-test.txt

@@ -1,4 +1,7 @@
+import os
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 from great_dictator.adapters.inbound.fastapi_app import create_app
 from great_dictator.adapters.outbound.sqlite_document_repository import (
@@ -7,11 +10,13 @@ from great_dictator.adapters.outbound.sqlite_document_repository import (
 from great_dictator.adapters.outbound.whisper_transcriber import WhisperTranscriber
 from great_dictator.domain.transcription import TranscriptionService
 
-# Create data directory if it doesn't exist
-data_dir = Path.home() / ".great-dictator"
-data_dir.mkdir(exist_ok=True)
+load_dotenv()
+
+db_path = os.getenv("DATABASE_PATH", "data/documents.db")
+db_dir = Path(db_path).parent
+db_dir.mkdir(parents=True, exist_ok=True)
 
 transcriber = WhisperTranscriber(model_size="base")
 service = TranscriptionService(transcriber)
-document_repository = SqliteDocumentRepository(str(data_dir / "documents.db"))
+document_repository = SqliteDocumentRepository(db_path)
 app = create_app(service, document_repository)
