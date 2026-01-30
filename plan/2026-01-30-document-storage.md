@@ -96,3 +96,23 @@ Database path is externalized to environment variables, allowing:
 - Wire document repository into FastAPI endpoints
 - Add document management UI (list, load, save, delete)
 - User authentication integration
+
+---
+
+## TODO: Create /web Skill
+
+**Reminder for tomorrow:** Create a `/web` skill/command that specifies the standard web stack:
+- **FastAPI** for backend
+- **htmx** for frontend interactivity
+- **Server-side state management** (not client-side JavaScript)
+
+The current frontend uses ~150 lines of inline JavaScript which:
+- Makes testing difficult (need E2E tests for everything)
+- Puts state management in the browser (source of bugs like Clear not resetting document state)
+- Doesn't follow the project's server-side architecture
+
+htmx would allow:
+- HTML responses from server with updated state
+- No client-side state to get out of sync
+- Easier testing (test server responses)
+- Simpler, more declarative frontend code

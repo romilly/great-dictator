@@ -1,4 +1,6 @@
 """E2E test fixtures with proper server management."""
+import os
+import sqlite3
 import subprocess
 import time
 from contextlib import contextmanager
@@ -7,11 +9,23 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 import pytest
+from dotenv import load_dotenv
 
 # Test server uses different port from manual testing (8765)
 TEST_SERVER_PORT = 8766
 TEST_SERVER_URL = f"http://localhost:{TEST_SERVER_PORT}"
 TEST_AUDIO_PATH = Path(__file__).parent.parent / "data" / "test_audio.wav"
+
+
+def clear_test_database() -> None:
+    """Clear all data from the test database."""
+    load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
+    db_path = os.getenv("DATABASE_PATH")
+    if db_path and Path(db_path).exists():
+        conn = sqlite3.connect(db_path)
+        conn.execute("DELETE FROM documents")
+        conn.commit()
+        conn.close()
 
 
 def wait_for_server(url: str, max_attempts: int = 30):
@@ -52,8 +66,16 @@ def managed_server(port: int):
 @pytest.fixture(scope="session")
 def server():
     """Start the FastAPI server for E2E tests on port 8766."""
+    clear_test_database()  # Clear before starting server
     with managed_server(TEST_SERVER_PORT) as proc:
         yield proc
+
+
+@pytest.fixture(autouse=True)
+def clean_database_between_tests():
+    """Clear test database before each test."""
+    clear_test_database()
+    yield
 
 
 @pytest.fixture(scope="session")

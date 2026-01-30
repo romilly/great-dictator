@@ -52,10 +52,11 @@ def test_file_menu_opens(server, server_url, page: Page):
 
     # Dropdown should now be visible with options
     expect(dropdown).to_be_visible()
-    expect(dropdown.locator("#clear")).to_have_text("Clear")
-    expect(dropdown.locator("#copy")).to_have_text("Copy")
-    expect(dropdown.locator("#save")).to_have_text("Save")
-    expect(dropdown.locator("#saveAs")).to_have_text("Save As")
+    expect(dropdown.locator("button:has-text('New')")).to_be_visible()
+    expect(dropdown.locator("button:has-text('Open')")).to_be_visible()
+    expect(dropdown.locator("button:has-text('Save')")).to_be_visible()
+    expect(dropdown.locator("button:has-text('Copy')")).to_be_visible()
+    expect(dropdown.locator("button:has-text('Clear')")).to_be_visible()
 
     # Click outside to close
     page.click("h1")

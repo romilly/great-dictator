@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Great Dictator</title>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <style>
         body {
             font-family: system-ui, sans-serif;
@@ -92,6 +93,22 @@
             font-size: 14px;
             margin-bottom: 10px;
         }
+        #docName {
+            font-weight: bold;
+            border: 1px solid transparent;
+            padding: 2px 4px;
+            background: transparent;
+            font-size: 14px;
+            width: 200px;
+        }
+        #docName:hover {
+            border-color: #ccc;
+        }
+        #docName:focus {
+            border-color: #4CAF50;
+            outline: none;
+            background: white;
+        }
         .modal {
             display: none;
             position: fixed;
@@ -138,19 +155,26 @@
         <div class="menu-item">
             <button id="fileMenuBtn">File</button>
             <div class="dropdown" id="fileDropdown">
-                <button id="newDoc">New</button>
-                <button id="open">Open...</button>
+                <button hx-post="/editor/new" hx-target="#editor-area" hx-swap="innerHTML" onclick="closeMenu()">New</button>
+                <button id="openBtn">Open...</button>
                 <hr>
-                <button id="save">Save</button>
-                <button id="saveAs">Save As...</button>
+                <button hx-post="/editor/save" hx-target="#editor-area" hx-swap="innerHTML" hx-include="#editor-area" onclick="closeMenu()">Save</button>
                 <hr>
-                <button id="copy">Copy</button>
-                <button id="clear">Clear</button>
+                <button id="copyBtn">Copy</button>
+                <button hx-post="/editor/clear" hx-target="#editor-area" hx-swap="innerHTML" onclick="closeMenu()">Clear</button>
             </div>
         </div>
     </div>
     <h1>Great Dictator</h1>
-    <div id="docTitle">Untitled document</div>
+
+    <div id="editor-area">
+        <div id="docTitle">
+            <input type="hidden" name="documentId" id="documentId" value="">
+            <input type="hidden" name="user" value="romilly">
+            <input type="text" id="docName" name="documentName" value="Untitled document" placeholder="Document name">
+        </div>
+        <textarea id="transcription" name="content" placeholder="Transcription will appear here..."></textarea>
+    </div>
 
     <div>
         <label for="micSelect">Microphone:</label>
@@ -164,65 +188,80 @@
         <button id="stop" disabled>Stop</button>
     </div>
     <div id="status"></div>
-    <textarea id="transcription" placeholder="Transcription will appear here..."></textarea>
 
     <div class="modal" id="openModal">
         <div class="modal-content">
             <button class="modal-close" id="closeModal">&times;</button>
             <h2>Open Document</h2>
-            <ul class="doc-list" id="docList">
+            <ul class="doc-list" id="docList" hx-get="/documents/list-html?user=romilly" hx-trigger="load">
                 <li>Loading...</li>
             </ul>
         </div>
     </div>
 
     <script>
-        let mediaRecorder;
-        let currentStream;
-        let audioChunks = [];
-        let lastTranscribedLength = 0;
-        const CHUNK_INTERVAL = 3000;
-
-        // Document state
-        let currentDocumentId = null;
-        let currentDocumentName = null;
-        const currentUser = 'romilly';
-
-        const recordBtn = document.getElementById('record');
-        const stopBtn = document.getElementById('stop');
-        const statusEl = document.getElementById('status');
-        const transcriptionEl = document.getElementById('transcription');
-        const micSelect = document.getElementById('micSelect');
-        const clearBtn = document.getElementById('clear');
-        const copyBtn = document.getElementById('copy');
-        const saveBtn = document.getElementById('save');
-        const saveAsBtn = document.getElementById('saveAs');
-        const newDocBtn = document.getElementById('newDoc');
-        const openBtn = document.getElementById('open');
+        // Menu handling
         const fileMenuBtn = document.getElementById('fileMenuBtn');
         const fileDropdown = document.getElementById('fileDropdown');
-        const docTitleEl = document.getElementById('docTitle');
-        const openModal = document.getElementById('openModal');
-        const closeModalBtn = document.getElementById('closeModal');
-        const docList = document.getElementById('docList');
 
-        function updateDocTitle() {
-            if (currentDocumentName) {
-                docTitleEl.textContent = currentDocumentName;
-            } else {
-                docTitleEl.textContent = 'Untitled document';
-            }
+        function closeMenu() {
+            fileDropdown.classList.remove('open');
         }
 
-        // File menu handling
         fileMenuBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             fileDropdown.classList.toggle('open');
         });
 
-        document.addEventListener('click', () => {
-            fileDropdown.classList.remove('open');
+        document.addEventListener('click', closeMenu);
+
+        // Copy button (pure JS - no server needed)
+        document.getElementById('copyBtn').addEventListener('click', async () => {
+            const text = document.getElementById('transcription').value;
+            await navigator.clipboard.writeText(text);
+            document.getElementById('status').textContent = 'Copied to clipboard';
+            closeMenu();
         });
+
+        // Open modal handling
+        const openBtn = document.getElementById('openBtn');
+        const openModal = document.getElementById('openModal');
+        const closeModalBtn = document.getElementById('closeModal');
+
+        openBtn.addEventListener('click', () => {
+            closeMenu();
+            // Trigger htmx to reload the document list
+            htmx.trigger('#docList', 'load');
+            openModal.classList.add('open');
+        });
+
+        closeModalBtn.addEventListener('click', () => {
+            openModal.classList.remove('open');
+        });
+
+        openModal.addEventListener('click', (e) => {
+            if (e.target === openModal) {
+                openModal.classList.remove('open');
+            }
+        });
+
+        // Close modal after loading a document (listen for htmx event)
+        document.body.addEventListener('htmx:afterSwap', (e) => {
+            if (e.detail.target.id === 'editor-area') {
+                openModal.classList.remove('open');
+            }
+        });
+
+        // Audio recording (must remain in JS - htmx can't do MediaRecorder)
+        let mediaRecorder;
+        let currentStream;
+        let audioChunks = [];
+        const CHUNK_INTERVAL = 3000;
+
+        const recordBtn = document.getElementById('record');
+        const stopBtn = document.getElementById('stop');
+        const statusEl = document.getElementById('status');
+        const micSelect = document.getElementById('micSelect');
 
         async function loadAudioDevices() {
             try {
@@ -264,7 +303,7 @@
                 });
                 const text = await response.text();
                 if (text.trim()) {
-                    transcriptionEl.value = text;
+                    document.getElementById('transcription').value = text;
                 }
             } catch (error) {
                 console.error('Transcription error:', error);
@@ -314,170 +353,6 @@
                 recordBtn.disabled = false;
                 stopBtn.disabled = true;
                 statusEl.textContent = 'Done';
-            }
-        });
-
-        // Document operations
-        async function saveDocument(name) {
-            const content = transcriptionEl.value;
-            try {
-                const response = await fetch('/documents', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        user: currentUser,
-                        name: name,
-                        content: content
-                    })
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    currentDocumentId = data.id;
-                    currentDocumentName = data.name;
-                    updateDocTitle();
-                    statusEl.textContent = `Saved as "${name}"`;
-                    return true;
-                } else {
-                    const error = await response.json();
-                    statusEl.textContent = `Error: ${error.detail || 'Failed to save'}`;
-                    return false;
-                }
-            } catch (error) {
-                statusEl.textContent = 'Error saving: ' + error.message;
-                return false;
-            }
-        }
-
-        async function updateDocument() {
-            const content = transcriptionEl.value;
-            try {
-                const response = await fetch(`/documents/${currentDocumentId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        user: currentUser,
-                        name: currentDocumentName,
-                        content: content
-                    })
-                });
-                if (response.ok) {
-                    statusEl.textContent = `Saved "${currentDocumentName}"`;
-                    return true;
-                } else {
-                    const error = await response.json();
-                    statusEl.textContent = `Error: ${error.detail || 'Failed to save'}`;
-                    return false;
-                }
-            } catch (error) {
-                statusEl.textContent = 'Error saving: ' + error.message;
-                return false;
-            }
-        }
-
-        async function loadDocumentList() {
-            try {
-                const response = await fetch(`/documents?user=${currentUser}`);
-                const documents = await response.json();
-
-                if (documents.length === 0) {
-                    docList.innerHTML = '<li style="color: #666; cursor: default;">No documents found</li>';
-                    return;
-                }
-
-                docList.innerHTML = '';
-                documents.forEach(doc => {
-                    const li = document.createElement('li');
-                    const date = new Date(doc.created);
-                    li.innerHTML = `
-                        <div class="doc-name">${doc.name}</div>
-                        <div class="doc-date">${date.toLocaleDateString()} ${date.toLocaleTimeString()}</div>
-                    `;
-                    li.addEventListener('click', () => loadDocument(doc.id));
-                    docList.appendChild(li);
-                });
-            } catch (error) {
-                docList.innerHTML = '<li style="color: red;">Error loading documents</li>';
-            }
-        }
-
-        async function loadDocument(id) {
-            try {
-                const response = await fetch(`/documents/${id}`);
-                if (response.ok) {
-                    const doc = await response.json();
-                    currentDocumentId = doc.id;
-                    currentDocumentName = doc.name;
-                    transcriptionEl.value = doc.content;
-                    updateDocTitle();
-                    openModal.classList.remove('open');
-                    statusEl.textContent = `Opened "${doc.name}"`;
-                } else {
-                    statusEl.textContent = 'Error loading document';
-                }
-            } catch (error) {
-                statusEl.textContent = 'Error: ' + error.message;
-            }
-        }
-
-        newDocBtn.addEventListener('click', () => {
-            currentDocumentId = null;
-            currentDocumentName = null;
-            transcriptionEl.value = '';
-            audioChunks = [];
-            updateDocTitle();
-            statusEl.textContent = 'New document';
-            fileDropdown.classList.remove('open');
-        });
-
-        openBtn.addEventListener('click', () => {
-            fileDropdown.classList.remove('open');
-            loadDocumentList();
-            openModal.classList.add('open');
-        });
-
-        closeModalBtn.addEventListener('click', () => {
-            openModal.classList.remove('open');
-        });
-
-        openModal.addEventListener('click', (e) => {
-            if (e.target === openModal) {
-                openModal.classList.remove('open');
-            }
-        });
-
-        clearBtn.addEventListener('click', () => {
-            transcriptionEl.value = '';
-            statusEl.textContent = 'Cleared';
-            fileDropdown.classList.remove('open');
-        });
-
-        copyBtn.addEventListener('click', async () => {
-            await navigator.clipboard.writeText(transcriptionEl.value);
-            statusEl.textContent = 'Copied to clipboard';
-            fileDropdown.classList.remove('open');
-        });
-
-        saveBtn.addEventListener('click', async () => {
-            fileDropdown.classList.remove('open');
-            if (currentDocumentId) {
-                // Update existing document
-                await updateDocument();
-            } else {
-                // New document - prompt for name
-                const name = prompt('Document name:', 'My Document');
-                if (name) {
-                    await saveDocument(name);
-                }
-            }
-        });
-
-        saveAsBtn.addEventListener('click', async () => {
-            fileDropdown.classList.remove('open');
-            const name = prompt('Document name:', currentDocumentName || 'My Document');
-            if (name) {
-                // Always create a new document
-                currentDocumentId = null;
-                await saveDocument(name);
             }
         });
     </script>
