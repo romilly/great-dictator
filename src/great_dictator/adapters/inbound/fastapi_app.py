@@ -1,7 +1,9 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Callable
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
@@ -43,8 +45,15 @@ class DocumentSummaryResponse(BaseModel):
 def create_app(
     transcription_service: TranscriptionService,
     document_repository: DocumentRepositoryPort | None = None,
+    on_shutdown: Callable[[], None] | None = None,
 ) -> FastAPI:
-    app = FastAPI()
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        yield
+        if on_shutdown is not None:
+            on_shutdown()
+
+    app = FastAPI(lifespan=lifespan)
 
     @app.get("/", response_class=HTMLResponse)
     async def index() -> FileResponse:
