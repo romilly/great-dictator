@@ -127,3 +127,25 @@ def wait_for_mic(page) -> None:
         "document.getElementById('micSelect').options[0].value !== ''",
         timeout=5000
     )
+
+
+def wait_for_document_saved(page) -> None:
+    """Wait for document to be saved (documentId becomes non-empty)."""
+    page.wait_for_function(
+        "document.getElementById('documentId').value !== ''",
+        timeout=10000
+    )
+
+
+def wait_for_document_cleared(page) -> None:
+    """Wait for document to be cleared (documentId becomes empty)."""
+    page.wait_for_function(
+        "document.getElementById('documentId').value === ''",
+        timeout=5000
+    )
+
+
+def click_menu_item(page, item: str) -> None:
+    """Open File menu and click an item."""
+    page.click("#fileMenuBtn")
+    page.click(f"button:has-text('{item}')")
