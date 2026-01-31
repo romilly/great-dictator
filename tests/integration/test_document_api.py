@@ -1,13 +1,18 @@
-from datetime import datetime
-
 import pytest
-from hamcrest import assert_that, equal_to, has_item, has_length
+from hamcrest import assert_that, contains_exactly
 from starlette.testclient import TestClient
 
 from great_dictator.adapters.inbound.fastapi_app import create_app
-from great_dictator.domain.document import Document
 from great_dictator.domain.transcription import TranscriptionService
+from tests.builders import a_document
 from tests.fakes.fake_document_repository import FakeDocumentRepository
+from tests.matchers import (
+    document_response,
+    is_created_with,
+    is_no_content,
+    is_not_found,
+    is_ok_with,
+)
 
 
 @pytest.fixture
@@ -36,59 +41,35 @@ def test_post_documents_returns_201_with_id(client):
         },
     )
 
-    assert_that(response.status_code, equal_to(201))
-    data = response.json()
-    assert "id" in data
-    assert_that(data["name"], equal_to("my doc"))
+    assert_that(response, is_created_with(document_response(name="my doc", has_id=True)))
 
 
 def test_get_documents_returns_users_documents(client, document_repository):
-    doc = Document(
-        user="romilly",
-        name="existing doc",
-        content="content",
-        created=datetime(2024, 1, 15, 10, 30),
-    )
+    doc = a_document().with_name("existing doc").build()
     document_repository.save(doc)
 
     response = client.get("/documents?user=romilly")
 
-    assert_that(response.status_code, equal_to(200))
-    data = response.json()
-    assert_that(data, has_length(1))
-    assert_that(data[0]["name"], equal_to("existing doc"))
+    assert_that(response, is_ok_with(contains_exactly(document_response(name="existing doc"))))
 
 
 def test_get_document_by_id_returns_document(client, document_repository):
-    doc = Document(
-        user="romilly",
-        name="test doc",
-        content="hello world",
-        created=datetime(2024, 1, 15, 10, 30),
-    )
+    doc = a_document().with_name("test doc").with_content("hello world").build()
     saved = document_repository.save(doc)
 
     response = client.get(f"/documents/{saved.id}")
 
-    assert_that(response.status_code, equal_to(200))
-    data = response.json()
-    assert_that(data["name"], equal_to("test doc"))
-    assert_that(data["content"], equal_to("hello world"))
+    assert_that(response, is_ok_with(document_response(name="test doc", content="hello world")))
 
 
 def test_get_document_by_id_returns_404_for_missing(client):
     response = client.get("/documents/999")
 
-    assert_that(response.status_code, equal_to(404))
+    assert_that(response, is_not_found())
 
 
 def test_put_document_updates_document(client, document_repository):
-    doc = Document(
-        user="romilly",
-        name="test doc",
-        content="original content",
-        created=datetime(2024, 1, 15, 10, 30),
-    )
+    doc = a_document().with_name("test doc").with_content("original content").build()
     saved = document_repository.save(doc)
 
     response = client.put(
@@ -100,9 +81,7 @@ def test_put_document_updates_document(client, document_repository):
         },
     )
 
-    assert_that(response.status_code, equal_to(200))
-    data = response.json()
-    assert_that(data["content"], equal_to("updated content"))
+    assert_that(response, is_ok_with(document_response(content="updated content")))
 
 
 def test_put_document_returns_404_for_missing(client):
@@ -115,25 +94,20 @@ def test_put_document_returns_404_for_missing(client):
         },
     )
 
-    assert_that(response.status_code, equal_to(404))
+    assert_that(response, is_not_found())
 
 
 def test_delete_document_removes_document(client, document_repository):
-    doc = Document(
-        user="romilly",
-        name="test doc",
-        content="hello world",
-        created=datetime(2024, 1, 15, 10, 30),
-    )
+    doc = a_document().with_name("test doc").with_content("hello world").build()
     saved = document_repository.save(doc)
 
     response = client.delete(f"/documents/{saved.id}")
 
-    assert_that(response.status_code, equal_to(204))
+    assert_that(response, is_no_content())
     assert document_repository.load(saved.id) is None  # type: ignore[arg-type]
 
 
 def test_delete_document_returns_404_for_missing(client):
     response = client.delete("/documents/999")
 
-    assert_that(response.status_code, equal_to(404))
+    assert_that(response, is_not_found())
