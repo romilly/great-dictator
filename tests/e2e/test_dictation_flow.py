@@ -1,6 +1,6 @@
 from playwright.sync_api import Page, expect
 
-from tests.e2e.conftest import check_visible
+from tests.e2e.conftest import check_visible, wait_for_mic
 
 
 def test_page_loads(loaded_page: Page):
@@ -11,12 +11,7 @@ def test_page_loads(loaded_page: Page):
 
 def test_microphone_populates(loaded_page: Page):
     """Test that the microphone selector populates with devices."""
-    # Wait for microphone to be populated
-    loaded_page.wait_for_function(
-        "document.getElementById('micSelect').options.length > 0 && "
-        "document.getElementById('micSelect').options[0].value !== ''",
-        timeout=5000
-    )
+    wait_for_mic(loaded_page)
     check_visible(loaded_page, "#micSelect")
 
 
@@ -47,14 +42,7 @@ def test_file_menu_opens(loaded_page: Page):
 
 def test_recording_starts(loaded_page: Page):
     """Test that clicking Record starts recording."""
-    # Wait for microphone to be populated
-    loaded_page.wait_for_function(
-        "document.getElementById('micSelect').options.length > 0 && "
-        "document.getElementById('micSelect').options[0].value !== ''",
-        timeout=5000
-    )
-
-    # Click Record
+    wait_for_mic(loaded_page)
     loaded_page.click("#record")
 
     # Wait for recording status

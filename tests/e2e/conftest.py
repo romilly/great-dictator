@@ -118,3 +118,12 @@ def check_visible(page, *selectors: str) -> None:
     from playwright.sync_api import expect
     for selector in selectors:
         expect(page.locator(selector)).to_be_visible()
+
+
+def wait_for_mic(page) -> None:
+    """Wait for microphone selector to be populated with devices."""
+    page.wait_for_function(
+        "document.getElementById('micSelect').options.length > 0 && "
+        "document.getElementById('micSelect').options[0].value !== ''",
+        timeout=5000
+    )
