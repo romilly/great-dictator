@@ -1,4 +1,4 @@
-"""E2E tests for document operations (save, clear, open) with htmx."""
+"""E2E tests for document operations (save, clear, open, export) with htmx."""
 from playwright.sync_api import Page, expect
 
 from tests.e2e.conftest import (
@@ -6,6 +6,22 @@ from tests.e2e.conftest import (
     wait_for_document_cleared,
     wait_for_document_saved,
 )
+
+
+def test_export_downloads_file_with_content(loaded_page: Page) -> None:
+    """Export should download a .txt file with the document content."""
+    loaded_page.locator("#docName").fill("My Notes")
+    loaded_page.locator("#transcription").fill("Hello world content")
+
+    with loaded_page.expect_download() as download_info:
+        click_menu_item(loaded_page, "Export")
+
+    download = download_info.value
+    assert download.suggested_filename == "My Notes.txt"
+
+    # Read the downloaded content
+    content = download.path().read_text()
+    assert content == "Hello world content"
 
 
 def test_clear_resets_document_state(loaded_page: Page) -> None:
