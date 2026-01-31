@@ -104,3 +104,17 @@ def browser_type_launch_args(browser_type_launch_args):
             f"--use-file-for-fake-audio-capture={TEST_AUDIO_PATH.absolute()}",
         ],
     }
+
+
+@pytest.fixture
+def loaded_page(server, server_url, page):
+    """Page with the app already loaded."""
+    page.goto(server_url)
+    return page
+
+
+def check_visible(page, *selectors: str) -> None:
+    """Assert that all given selectors are visible on the page."""
+    from playwright.sync_api import expect
+    for selector in selectors:
+        expect(page.locator(selector)).to_be_visible()

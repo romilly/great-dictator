@@ -159,6 +159,7 @@
                 <button id="openBtn">Open...</button>
                 <hr>
                 <button hx-post="/editor/save" hx-target="#editor-area" hx-swap="innerHTML" hx-include="#editor-area" onclick="closeMenu()">Save</button>
+                <button id="exportBtn">Export</button>
                 <hr>
                 <button id="copyBtn">Copy</button>
                 <button hx-post="/editor/clear" hx-target="#editor-area" hx-swap="innerHTML" onclick="closeMenu()">Clear</button>
@@ -220,6 +221,20 @@
             const text = document.getElementById('transcription').value;
             await navigator.clipboard.writeText(text);
             document.getElementById('status').textContent = 'Copied to clipboard';
+            closeMenu();
+        });
+
+        // Export button (pure JS - downloads as local file)
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            const text = document.getElementById('transcription').value;
+            const name = document.getElementById('docName').value || 'Untitled';
+            const blob = new Blob([text], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = name + '.txt';
+            a.click();
+            URL.revokeObjectURL(a.href);
+            document.getElementById('status').textContent = 'Exported ' + name + '.txt';
             closeMenu();
         });
 
