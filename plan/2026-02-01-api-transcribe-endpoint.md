@@ -71,6 +71,27 @@ Type checking: 0 errors (pyright)
 - FastAPI async endpoint calls synchronous transcription (blocks event loop during transcription)
 - This matches existing `/transcribe` htmx endpoint behavior
 
+## Jetson Xavier Deployment
+
+### Installation on ARM64
+
+Faster-whisper/CTranslate2 has no pre-built ARM64 wheels, requiring compilation from source:
+
+1. Install Rust: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+2. Install maturin: `pip install maturin`
+3. Install app: `pip install .` (compiles CTranslate2)
+
+### Configuration for Jetson
+
+- Model: `large-v3` for best accuracy
+- Device: `cuda` (uses Jetson's GPU)
+- Compute type: `float16`
+- Server binds to `0.0.0.0:8765` for remote access
+
+### Documentation
+
+Created `docs/jetson-xavier-install.md` with full installation guide.
+
 ## Next Steps
 
 - Consider `asyncio.to_thread()` for non-blocking transcription
