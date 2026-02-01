@@ -6,8 +6,8 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-echo "Starting dev server on http://localhost:8765"
+echo "Starting dev server on http://0.0.0.0:8765"
 echo "Press Ctrl+C to stop"
 echo ""
 
-uvicorn great_dictator.app:app --port 8765 --reload
+uvicorn great_dictator.app:app --host 0.0.0.0 --port 8765 --reload
