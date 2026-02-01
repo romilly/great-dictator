@@ -128,7 +128,7 @@ def create_app(
         vad = webrtcvad.Vad(3)  # Aggressiveness 0-3, 3 is most aggressive
         frame_duration_ms = 30  # webrtcvad requires 10, 20, or 30ms frames
         frame_size = SAMPLE_RATE * frame_duration_ms // 1000 * SAMPLE_WIDTH  # bytes per frame
-        silence_threshold_ms = 600  # Silence duration to trigger transcription
+        silence_threshold_ms = 1000  # Silence duration to trigger transcription
         min_speech_duration_ms = 300  # Minimum speech before we transcribe
         lookback_ms = 300  # Keep this much audio before speech starts
         lookback_size = SAMPLE_RATE * lookback_ms // 1000 * SAMPLE_WIDTH
