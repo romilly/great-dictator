@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -51,8 +49,8 @@ class DocumentSummaryResponse(BaseModel):
 
 def create_app(
     transcription_service: TranscriptionService,
-    document_repository: DocumentRepositoryPort | None = None,
-    on_shutdown: Callable[[], None] | None = None,
+    document_repository: Optional[DocumentRepositoryPort] = None,
+    on_shutdown: Optional[Callable[[], None]] = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
