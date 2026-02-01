@@ -48,7 +48,7 @@ Issues = "https://github.com/romilly/great-dictator/issues"
 where = ["src"]
 
 [tool.setuptools.package-data]
-great_dictator = ["static/*"]
+great_dictator = ["static/*", "adapters/inbound/templates/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
