@@ -55,3 +55,18 @@ def test_transcribe_htmx_returns_editor_fragment(client, fake_transcriber):
     assert_that(response.text, contains_string("Previous text."))
     assert_that(response.text, contains_string("fake transcription"))
     assert_that(response.text, contains_string('id="transcription"'))
+
+
+def test_api_transcribe_returns_json(client, fake_transcriber):
+    """POST /api/transcribe with raw WAV bytes returns JSON with text."""
+    audio_content = b"fake wav audio data"
+
+    response = client.post(
+        "/api/transcribe",
+        content=audio_content,
+        headers={"Content-Type": "audio/wav"},
+    )
+
+    assert_that(response.status_code, equal_to(200))
+    assert_that(response.headers["content-type"], contains_string("application/json"))
+    assert_that(response.json(), equal_to({"text": "fake transcription"}))

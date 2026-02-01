@@ -5,8 +5,8 @@ from io import BytesIO
 from pathlib import Path
 from typing import Annotated, Callable
 
-from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 from great_dictator.adapters.inbound.templates import render_document_list, render_editor
@@ -75,6 +75,12 @@ def create_app(
 
         # Otherwise return just the text (backward compatible)
         return result.text
+
+    @app.post("/api/transcribe")
+    async def api_transcribe(request: Request) -> JSONResponse:
+        audio_bytes = await request.body()
+        result = transcription_service.transcribe(BytesIO(audio_bytes))
+        return JSONResponse(content={"text": result.text})
 
     if document_repository is not None:
         @app.post("/documents", status_code=201, response_model=DocumentResponse)
