@@ -124,13 +124,16 @@ def create_app(
         await websocket.accept()
         await websocket.send_json({"type": "ready"})
 
-        # VAD setup
-        vad = webrtcvad.Vad(3)  # Aggressiveness 0-3, 3 is most aggressive
+        # VAD setup - configurable via environment variables
+        import os
+        vad_aggressiveness = int(os.environ.get("VAD_AGGRESSIVENESS", "2"))
+        silence_threshold_ms = int(os.environ.get("VAD_SILENCE_THRESHOLD_MS", "700"))
+        min_speech_duration_ms = int(os.environ.get("VAD_MIN_SPEECH_MS", "300"))
+        lookback_ms = int(os.environ.get("VAD_LOOKBACK_MS", "300"))
+
+        vad = webrtcvad.Vad(vad_aggressiveness)
         frame_duration_ms = 30  # webrtcvad requires 10, 20, or 30ms frames
         frame_size = SAMPLE_RATE * frame_duration_ms // 1000 * SAMPLE_WIDTH  # bytes per frame
-        silence_threshold_ms = 1000  # Silence duration to trigger transcription
-        min_speech_duration_ms = 300  # Minimum speech before we transcribe
-        lookback_ms = 300  # Keep this much audio before speech starts
         lookback_size = SAMPLE_RATE * lookback_ms // 1000 * SAMPLE_WIDTH
 
         audio_buffer = bytearray()  # Speech audio for VAD-triggered transcription

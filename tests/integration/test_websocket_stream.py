@@ -74,7 +74,7 @@ def test_websocket_stream_auto_transcribes_after_silence(client, fake_transcribe
             websocket.send_bytes(speech_chunk)
 
         # Send silence - server should auto-transcribe after detecting silence
-        for _ in range(15):  # 1500ms of silence (exceeds 1000ms threshold)
+        for _ in range(10):  # 1000ms of silence (exceeds 700ms threshold)
             websocket.send_bytes(silence_chunk)
 
         # Should receive transcription result automatically
