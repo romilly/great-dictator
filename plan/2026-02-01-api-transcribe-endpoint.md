@@ -73,13 +73,26 @@ Type checking: 0 errors (pyright)
 
 ## Jetson Xavier Deployment
 
-### Installation on ARM64
+### Challenges Overcome
 
-Faster-whisper/CTranslate2 has no pre-built ARM64 wheels, requiring compilation from source:
+1. **Python 3.8 incompatibility** - tokenizers library requires Python 3.9+
+2. **CTranslate2 CUDA support** - no pre-built ARM64 wheels, must compile from source
+3. **bfloat16 errors** - Xavier (compute 7.2) doesn't support bfloat16, requires CTranslate2 v3.24.0
+4. **Type annotation compatibility** - `from __future__ import annotations` breaks FastAPI/Pydantic runtime evaluation
+5. **htmx file upload** - htmx.ajax doesn't handle FormData with files, switched to fetch
+6. **Route ordering** - `/documents/list-html` must be defined before `/documents/{document_id}`
+7. **Secure context for microphone** - requires SSH port forwarding for remote access
 
-1. Install Rust: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-2. Install maturin: `pip install maturin`
-3. Install app: `pip install .` (compiles CTranslate2)
+### Build Process
+
+```bash
+# CTranslate2 v3.24.0 with CUDA for Xavier
+git clone --recursive https://github.com/OpenNMT/CTranslate2.git
+cd CTranslate2 && git checkout v3.24.0
+cmake . -DWITH_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=72 -DWITH_CUDNN=ON -DWITH_MKL=OFF -DOPENMP_RUNTIME=COMP
+make -j2 && sudo make install && sudo ldconfig
+cd python && pip install . --no-build-isolation
+```
 
 ### Configuration for Jetson
 
@@ -90,7 +103,7 @@ Faster-whisper/CTranslate2 has no pre-built ARM64 wheels, requiring compilation 
 
 ### Documentation
 
-Created `docs/jetson-xavier-install.md` with full installation guide.
+Created comprehensive `docs/jetson-xavier-install.md` with full installation guide and troubleshooting.
 
 ## Next Steps
 
