@@ -49,6 +49,11 @@ def create_app(
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        # Warmup: force model into memory before accepting requests
+        try:
+            transcription_service.transcribe(BytesIO(b""))
+        except Exception:
+            pass  # Empty audio fails, but model is now loaded
         yield
         if on_shutdown is not None:
             on_shutdown()

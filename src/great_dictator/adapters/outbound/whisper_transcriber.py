@@ -8,8 +8,15 @@ from great_dictator.domain.transcription import TranscriberPort, TranscriptionRe
 
 
 class WhisperTranscriber(TranscriberPort):
-    def __init__(self, model_size: str = "base"):
-        self._model: WhisperModel | None = WhisperModel(model_size, device="cpu", compute_type="int8")
+    def __init__(
+        self,
+        model_size: str = "base",
+        device: str = "cpu",
+        compute_type: str = "int8",
+    ):
+        self._model: WhisperModel | None = WhisperModel(
+            model_size, device=device, compute_type=compute_type
+        )
         self._lock = threading.Lock()
 
     def transcribe(self, audio: BytesIO) -> TranscriptionResult:

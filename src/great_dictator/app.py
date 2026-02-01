@@ -16,7 +16,7 @@ db_path = os.getenv("DATABASE_PATH", "data/documents.db")
 db_dir = Path(db_path).parent
 db_dir.mkdir(parents=True, exist_ok=True)
 
-transcriber = WhisperTranscriber(model_size="base")
+transcriber = WhisperTranscriber(model_size="large-v3", device="cuda", compute_type="float16")
 service = TranscriptionService(transcriber)
 document_repository = SqliteDocumentRepository(db_path)
 app = create_app(service, document_repository, on_shutdown=transcriber.close)

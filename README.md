@@ -9,10 +9,11 @@ In early (alpha) development, but already usable and fun!
 ## Features
 
 - Browser-based audio recording using MediaRecorder API
-- Speech-to-text transcription using faster-whisper
+- Speech-to-text transcription using faster-whisper (large-v3 model, CUDA GPU, float16)
 - Simple web interface with Record/Stop controls
 - File menu for managing transcriptions (Copy, Save, Save As)
 - Persistent document storage with SQLite
+- JSON API for service-to-service transcription
 - Hexagonal architecture for clean separation of concerns
 
 ## Architecture
@@ -36,6 +37,24 @@ In early (alpha) development, but already usable and fun!
 │  WhisperTranscriber          SqliteDocumentRepository       │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+## API
+
+### POST /api/transcribe
+
+Stateless JSON endpoint for service-to-service transcription.
+
+```bash
+curl -X POST http://localhost:8765/api/transcribe \
+  -H "Content-Type: audio/wav" \
+  --data-binary @audio.wav
+```
+
+**Response:** `{"text": "transcribed text"}`
+
+**Errors:**
+- `400` - Content-Type must be `audio/wav`
+- `503` - Transcriber unavailable (server shutting down)
 
 ## Installation
 
