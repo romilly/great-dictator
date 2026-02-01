@@ -119,10 +119,35 @@ def create_app(
 
     @app.websocket("/api/stream")
     async def stream_transcribe(websocket: WebSocket) -> None:
+        import webrtcvad
+
         await websocket.accept()
         await websocket.send_json({"type": "ready"})
 
+        # VAD setup
+        vad = webrtcvad.Vad(2)  # Aggressiveness 0-3, 2 is moderate
+        frame_duration_ms = 30  # webrtcvad requires 10, 20, or 30ms frames
+        frame_size = SAMPLE_RATE * frame_duration_ms // 1000 * SAMPLE_WIDTH  # bytes per frame
+        silence_threshold_ms = 500  # Silence duration to trigger transcription
+
         audio_buffer = bytearray()
+        vad_buffer = bytearray()  # Buffer for incomplete VAD frames
+        speech_detected = False
+        silence_duration_ms = 0
+
+        async def transcribe_and_send() -> None:
+            nonlocal audio_buffer, speech_detected, silence_duration_ms
+            if audio_buffer:
+                wav_audio = _pcm_to_wav(bytes(audio_buffer))
+                result = transcription_service.transcribe(BytesIO(wav_audio))
+                if result.text.strip():  # Only send non-empty transcriptions
+                    await websocket.send_json({
+                        "type": "final",
+                        "text": result.text,
+                    })
+                audio_buffer.clear()
+            speech_detected = False
+            silence_duration_ms = 0
 
         try:
             while True:
@@ -132,21 +157,32 @@ def create_app(
                     break
 
                 if "bytes" in message:
-                    audio_buffer.extend(message["bytes"])
+                    chunk = message["bytes"]
+                    audio_buffer.extend(chunk)
+                    vad_buffer.extend(chunk)
+
+                    # Process complete VAD frames
+                    while len(vad_buffer) >= frame_size:
+                        frame = bytes(vad_buffer[:frame_size])
+                        vad_buffer = vad_buffer[frame_size:]
+
+                        is_speech = vad.is_speech(frame, SAMPLE_RATE)
+
+                        if is_speech:
+                            speech_detected = True
+                            silence_duration_ms = 0
+                        elif speech_detected:
+                            silence_duration_ms += frame_duration_ms
+                            if silence_duration_ms >= silence_threshold_ms:
+                                await transcribe_and_send()
 
                 elif "text" in message:
                     import json
                     data = json.loads(message["text"])
 
+                    # Manual end_of_speech signal (backward compatible)
                     if data.get("type") == "end_of_speech" and audio_buffer:
-                        # Convert PCM to WAV for transcription
-                        wav_audio = _pcm_to_wav(bytes(audio_buffer))
-                        result = transcription_service.transcribe(BytesIO(wav_audio))
-                        await websocket.send_json({
-                            "type": "final",
-                            "text": result.text,
-                        })
-                        audio_buffer.clear()
+                        await transcribe_and_send()
 
         except Exception as e:
             try:
