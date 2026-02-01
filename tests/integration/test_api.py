@@ -83,3 +83,26 @@ def test_api_transcribe_returns_400_for_invalid_content_type(client):
     )
 
     assert_that(response.status_code, equal_to(400))
+
+
+def test_api_transcribe_returns_503_when_transcriber_closed(fake_transcriber):
+    """POST /api/transcribe when transcriber is closed returns 503."""
+    from io import BytesIO
+
+    from great_dictator.domain.transcription import TranscriberPort, TranscriptionResult
+
+    class ClosedTranscriber(TranscriberPort):
+        def transcribe(self, audio: BytesIO) -> TranscriptionResult:
+            raise RuntimeError("Transcriber has been closed")
+
+    service = TranscriptionService(ClosedTranscriber())
+    app = create_app(service)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/transcribe",
+        content=b"audio data",
+        headers={"Content-Type": "audio/wav"},
+    )
+
+    assert_that(response.status_code, equal_to(503))

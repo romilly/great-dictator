@@ -82,7 +82,10 @@ def create_app(
         if not content_type.startswith("audio/wav"):
             raise HTTPException(status_code=400, detail="Content-Type must be audio/wav")
         audio_bytes = await request.body()
-        result = transcription_service.transcribe(BytesIO(audio_bytes))
+        try:
+            result = transcription_service.transcribe(BytesIO(audio_bytes))
+        except RuntimeError:
+            raise HTTPException(status_code=503, detail="Transcriber unavailable")
         return JSONResponse(content={"text": result.text})
 
     if document_repository is not None:
