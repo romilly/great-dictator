@@ -129,28 +129,22 @@ def create_app(
         vad_aggressiveness = int(os.environ.get("VAD_AGGRESSIVENESS", "2"))
         silence_threshold_ms = int(os.environ.get("VAD_SILENCE_THRESHOLD_MS", "700"))
         min_speech_duration_ms = int(os.environ.get("VAD_MIN_SPEECH_MS", "300"))
-        lookback_ms = int(os.environ.get("VAD_LOOKBACK_MS", "300"))
 
         vad = webrtcvad.Vad(vad_aggressiveness)
         frame_duration_ms = 30  # webrtcvad requires 10, 20, or 30ms frames
         frame_size = SAMPLE_RATE * frame_duration_ms // 1000 * SAMPLE_WIDTH  # bytes per frame
-        lookback_size = SAMPLE_RATE * lookback_ms // 1000 * SAMPLE_WIDTH
 
-        audio_buffer = bytearray()  # Speech audio for VAD-triggered transcription
-        raw_buffer = bytearray()  # All audio for end_of_speech fallback
-        lookback_buffer = bytearray()  # Rolling buffer of recent audio
+        audio_buffer = bytearray()  # ALL audio
         vad_buffer = bytearray()  # Buffer for incomplete VAD frames
         speech_detected = False
         speech_duration_ms = 0
         silence_duration_ms = 0
 
-        async def transcribe_and_send(force: bool = False) -> None:
-            nonlocal audio_buffer, raw_buffer, lookback_buffer, speech_detected, speech_duration_ms, silence_duration_ms
-            # Use raw_buffer for forced (end_of_speech), audio_buffer for VAD-triggered
-            buffer_to_use = raw_buffer if force else audio_buffer
-            # Only transcribe if we had enough speech (unless forced)
-            if buffer_to_use and (force or speech_duration_ms >= min_speech_duration_ms):
-                wav_audio = _pcm_to_wav(bytes(buffer_to_use))
+        async def transcribe_and_send() -> None:
+            nonlocal audio_buffer, speech_detected, speech_duration_ms, silence_duration_ms
+            # Only transcribe if we had enough speech
+            if audio_buffer and speech_duration_ms >= min_speech_duration_ms:
+                wav_audio = _pcm_to_wav(bytes(audio_buffer))
                 result = transcription_service.transcribe(BytesIO(wav_audio))
                 if result.text.strip():  # Only send non-empty transcriptions
                     await websocket.send_json({
@@ -158,8 +152,6 @@ def create_app(
                         "text": result.text,
                     })
             audio_buffer.clear()
-            raw_buffer.clear()
-            lookback_buffer.clear()
             speech_detected = False
             speech_duration_ms = 0
             silence_duration_ms = 0
@@ -173,7 +165,7 @@ def create_app(
 
                 if "bytes" in message:
                     chunk = message["bytes"]
-                    raw_buffer.extend(chunk)  # Keep all audio for end_of_speech fallback
+                    audio_buffer.extend(chunk)  # Buffer ALL audio
                     vad_buffer.extend(chunk)
 
                     # Process complete VAD frames
@@ -184,34 +176,32 @@ def create_app(
                         is_speech = vad.is_speech(frame, SAMPLE_RATE)
 
                         if is_speech:
-                            if not speech_detected:
-                                # First speech frame - include lookback buffer
-                                audio_buffer.extend(lookback_buffer)
-                                lookback_buffer.clear()
                             speech_detected = True
                             speech_duration_ms += frame_duration_ms
                             silence_duration_ms = 0
-                            audio_buffer.extend(frame)
                         elif speech_detected:
-                            # Still in speech segment, include this frame
-                            audio_buffer.extend(frame)
                             silence_duration_ms += frame_duration_ms
                             if silence_duration_ms >= silence_threshold_ms:
                                 await transcribe_and_send()
-                        else:
-                            # No speech yet - add to lookback buffer
-                            lookback_buffer.extend(frame)
-                            # Trim lookback buffer to max size
-                            if len(lookback_buffer) > lookback_size:
-                                lookback_buffer = lookback_buffer[-lookback_size:]
 
                 elif "text" in message:
                     import json
                     data = json.loads(message["text"])
 
-                    # Manual end_of_speech signal (backward compatible, bypasses min duration)
-                    if data.get("type") == "end_of_speech" and raw_buffer:
-                        await transcribe_and_send(force=True)
+                    # Manual end_of_speech signal (backward compatible)
+                    if data.get("type") == "end_of_speech" and audio_buffer:
+                        # Force transcription regardless of min_speech_duration
+                        wav_audio = _pcm_to_wav(bytes(audio_buffer))
+                        result = transcription_service.transcribe(BytesIO(wav_audio))
+                        if result.text.strip():
+                            await websocket.send_json({
+                                "type": "final",
+                                "text": result.text,
+                            })
+                        audio_buffer.clear()
+                        speech_detected = False
+                        speech_duration_ms = 0
+                        silence_duration_ms = 0
 
         except Exception as e:
             try:
