@@ -313,12 +313,17 @@
             formData.append('audio', audioBlob, 'recording.webm');
             formData.append('existingContent', existingContent);
 
-            // Use htmx.ajax for consistent htmx-based UI updates
-            htmx.ajax('POST', '/transcribe', {
-                target: '#editor-area',
-                swap: 'innerHTML',
-                values: formData
+            // Use fetch for file upload (htmx.ajax doesn't handle FormData with files)
+            const response = await fetch('/transcribe', {
+                method: 'POST',
+                headers: { 'HX-Request': 'true' },
+                body: formData
             });
+            if (response.ok) {
+                const html = await response.text();
+                document.getElementById('editor-area').innerHTML = html;
+                htmx.process(document.getElementById('editor-area'));
+            }
         }
 
         recordBtn.addEventListener('click', async () => {
