@@ -10,7 +10,7 @@ try:
 except ImportError:
     from typing_extensions import Annotated
 
-from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile, WebSocket
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
@@ -19,6 +19,25 @@ from great_dictator.domain.document import Document, DocumentRepositoryPort
 from great_dictator.domain.transcription import TranscriptionService
 
 STATIC_DIR = Path(__file__).parent.parent.parent / "static"
+
+# Audio constants for PCM to WAV conversion
+SAMPLE_RATE = 16000
+CHANNELS = 1
+SAMPLE_WIDTH = 2  # 16-bit
+
+
+def _pcm_to_wav(pcm_data: bytes) -> bytes:
+    """Convert raw PCM audio to WAV format."""
+    import struct
+    import wave
+
+    output = BytesIO()
+    with wave.open(output, "wb") as wav_file:
+        wav_file.setnchannels(CHANNELS)
+        wav_file.setsampwidth(SAMPLE_WIDTH)
+        wav_file.setframerate(SAMPLE_RATE)
+        wav_file.writeframes(pcm_data)
+    return output.getvalue()
 
 
 class DocumentCreateRequest(BaseModel):
@@ -97,6 +116,43 @@ def create_app(
         except RuntimeError:
             raise HTTPException(status_code=503, detail="Transcriber unavailable")
         return JSONResponse(content={"text": result.text})
+
+    @app.websocket("/api/stream")
+    async def stream_transcribe(websocket: WebSocket) -> None:
+        await websocket.accept()
+        await websocket.send_json({"type": "ready"})
+
+        audio_buffer = bytearray()
+
+        try:
+            while True:
+                message = await websocket.receive()
+
+                if message["type"] == "websocket.disconnect":
+                    break
+
+                if "bytes" in message:
+                    audio_buffer.extend(message["bytes"])
+
+                elif "text" in message:
+                    import json
+                    data = json.loads(message["text"])
+
+                    if data.get("type") == "end_of_speech" and audio_buffer:
+                        # Convert PCM to WAV for transcription
+                        wav_audio = _pcm_to_wav(bytes(audio_buffer))
+                        result = transcription_service.transcribe(BytesIO(wav_audio))
+                        await websocket.send_json({
+                            "type": "final",
+                            "text": result.text,
+                        })
+                        audio_buffer.clear()
+
+        except Exception as e:
+            try:
+                await websocket.send_json({"type": "error", "message": str(e)})
+            except Exception:
+                pass
 
     if document_repository is not None:
         @app.post("/documents", status_code=201, response_model=DocumentResponse)
