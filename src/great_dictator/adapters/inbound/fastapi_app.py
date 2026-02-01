@@ -125,19 +125,22 @@ def create_app(
         await websocket.send_json({"type": "ready"})
 
         # VAD setup
-        vad = webrtcvad.Vad(2)  # Aggressiveness 0-3, 2 is moderate
+        vad = webrtcvad.Vad(3)  # Aggressiveness 0-3, 3 is most aggressive
         frame_duration_ms = 30  # webrtcvad requires 10, 20, or 30ms frames
         frame_size = SAMPLE_RATE * frame_duration_ms // 1000 * SAMPLE_WIDTH  # bytes per frame
-        silence_threshold_ms = 500  # Silence duration to trigger transcription
+        silence_threshold_ms = 700  # Silence duration to trigger transcription
+        min_speech_duration_ms = 400  # Minimum speech before we transcribe
 
         audio_buffer = bytearray()
         vad_buffer = bytearray()  # Buffer for incomplete VAD frames
         speech_detected = False
+        speech_duration_ms = 0
         silence_duration_ms = 0
 
-        async def transcribe_and_send() -> None:
-            nonlocal audio_buffer, speech_detected, silence_duration_ms
-            if audio_buffer:
+        async def transcribe_and_send(force: bool = False) -> None:
+            nonlocal audio_buffer, speech_detected, speech_duration_ms, silence_duration_ms
+            # Only transcribe if we had enough speech (unless forced)
+            if audio_buffer and (force or speech_duration_ms >= min_speech_duration_ms):
                 wav_audio = _pcm_to_wav(bytes(audio_buffer))
                 result = transcription_service.transcribe(BytesIO(wav_audio))
                 if result.text.strip():  # Only send non-empty transcriptions
@@ -145,8 +148,9 @@ def create_app(
                         "type": "final",
                         "text": result.text,
                     })
-                audio_buffer.clear()
+            audio_buffer.clear()
             speech_detected = False
+            speech_duration_ms = 0
             silence_duration_ms = 0
 
         try:
@@ -170,6 +174,7 @@ def create_app(
 
                         if is_speech:
                             speech_detected = True
+                            speech_duration_ms += frame_duration_ms
                             silence_duration_ms = 0
                         elif speech_detected:
                             silence_duration_ms += frame_duration_ms
@@ -180,9 +185,9 @@ def create_app(
                     import json
                     data = json.loads(message["text"])
 
-                    # Manual end_of_speech signal (backward compatible)
+                    # Manual end_of_speech signal (backward compatible, bypasses min duration)
                     if data.get("type") == "end_of_speech" and audio_buffer:
-                        await transcribe_and_send()
+                        await transcribe_and_send(force=True)
 
         except Exception as e:
             try:

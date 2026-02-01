@@ -25,7 +25,14 @@ class WhisperTranscriber(TranscriberPort):
         if self._model is None:
             raise RuntimeError("Transcriber has been closed")
         with self._lock:
-            segments, info = self._model.transcribe(audio)
+            segments, info = self._model.transcribe(
+                audio,
+                vad_filter=True,  # Filter out non-speech segments
+                vad_parameters=dict(
+                    min_silence_duration_ms=500,  # Minimum silence to split
+                    speech_pad_ms=200,  # Padding around speech
+                ),
+            )
             text = " ".join(segment.text.strip() for segment in segments)
         return TranscriptionResult(text=text, language=info.language)
 
