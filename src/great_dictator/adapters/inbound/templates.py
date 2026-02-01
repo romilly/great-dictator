@@ -1,6 +1,9 @@
 """HTML template rendering using Jinja2."""
+from __future__ import annotations
+
 from datetime import datetime
 from pathlib import Path
+from typing import List, Optional, Tuple
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -13,7 +16,7 @@ _env = Environment(
 
 
 def render_editor(
-    document_id: int | None = None,
+    document_id: Optional[int] = None,
     document_name: str = "Untitled document",
     content: str = "",
     user: str = "romilly",
@@ -30,7 +33,7 @@ def render_editor(
     )
 
 
-def render_document_list(documents: list[tuple[int, str, datetime]]) -> str:
+def render_document_list(documents: List[Tuple[int, str, datetime]]) -> str:
     """Render the document list HTML fragment."""
     template = _env.get_template("document_list.html")
     return template.render(documents=documents)
