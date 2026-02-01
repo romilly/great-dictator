@@ -26,6 +26,7 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "python-multipart",
+    "typing_extensions; python_version < '3.9'",
 ]
 
 [project.optional-dependencies]

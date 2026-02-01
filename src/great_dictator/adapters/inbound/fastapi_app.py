@@ -3,7 +3,12 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Annotated, Callable
+from typing import Callable
+
+try:
+    from typing import Annotated
+except ImportError:
+    from typing_extensions import Annotated
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
