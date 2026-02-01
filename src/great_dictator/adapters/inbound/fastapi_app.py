@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Optional
 
 try:
     from typing import Annotated
@@ -75,7 +75,7 @@ def create_app(
     async def transcribe(
         audio: UploadFile = File(...),
         existingContent: Annotated[str, Form()] = "",
-        hx_request: Annotated[str | None, Header(alias="HX-Request")] = None,
+        hx_request: Annotated[Optional[str], Header(alias="HX-Request")] = None,
     ) -> str:
         audio_bytes = await audio.read()
         result = transcription_service.transcribe(BytesIO(audio_bytes))
