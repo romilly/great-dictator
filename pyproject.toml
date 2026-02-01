@@ -26,6 +26,8 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "python-multipart",
+    "python-dotenv",
+    "jinja2",
     "typing_extensions; python_version < '3.9'",
 ]
 
