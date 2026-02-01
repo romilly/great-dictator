@@ -124,6 +124,12 @@ def create_app(
                 for s in summaries
             ]
 
+        @app.get("/documents/list-html", response_class=HTMLResponse)
+        async def documents_list_html(user: str) -> str:
+            summaries = document_repository.list_for_user(user)
+            documents = [(s.id, s.name, s.created) for s in summaries]
+            return render_document_list(documents)
+
         @app.get("/documents/{document_id}", response_model=DocumentResponse)
         async def get_document(document_id: int) -> DocumentResponse:
             doc = document_repository.load(document_id)
@@ -222,11 +228,5 @@ def create_app(
                 doc.id, doc.name, doc.content, doc.user,
                 status=f'Opened "{doc.name}"',
             )
-
-        @app.get("/documents/list-html", response_class=HTMLResponse)
-        async def documents_list_html(user: str) -> str:
-            summaries = document_repository.list_for_user(user)
-            documents = [(s.id, s.name, s.created) for s in summaries]
-            return render_document_list(documents)
 
     return app
