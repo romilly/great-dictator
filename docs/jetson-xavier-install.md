@@ -60,6 +60,19 @@ The server will:
 
 ## Configuration
 
+### Model Cache Location
+
+The large-v3 model is ~3GB. By default, Hugging Face downloads models to `~/.cache/huggingface/`. If your root filesystem is small (common on Jetson with NVMe boot + HDD storage), set `HF_HOME` to redirect downloads:
+
+```bash
+# Add to ~/.bashrc
+export HF_HOME=/path/to/large/drive/.cache/huggingface
+```
+
+Then `source ~/.bashrc` before running the server.
+
+### Whisper Model
+
 The Whisper model is configured in `src/great_dictator/app.py`:
 
 ```python
