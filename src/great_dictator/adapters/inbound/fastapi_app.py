@@ -78,6 +78,9 @@ def create_app(
 
     @app.post("/api/transcribe")
     async def api_transcribe(request: Request) -> JSONResponse:
+        content_type = request.headers.get("content-type", "")
+        if not content_type.startswith("audio/wav"):
+            raise HTTPException(status_code=400, detail="Content-Type must be audio/wav")
         audio_bytes = await request.body()
         result = transcription_service.transcribe(BytesIO(audio_bytes))
         return JSONResponse(content={"text": result.text})

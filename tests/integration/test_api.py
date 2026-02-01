@@ -70,3 +70,16 @@ def test_api_transcribe_returns_json(client, fake_transcriber):
     assert_that(response.status_code, equal_to(200))
     assert_that(response.headers["content-type"], contains_string("application/json"))
     assert_that(response.json(), equal_to({"text": "fake transcription"}))
+
+
+def test_api_transcribe_returns_400_for_invalid_content_type(client):
+    """POST /api/transcribe without audio/wav content-type returns 400."""
+    audio_content = b"fake audio data"
+
+    response = client.post(
+        "/api/transcribe",
+        content=audio_content,
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert_that(response.status_code, equal_to(400))
