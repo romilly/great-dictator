@@ -111,7 +111,7 @@ Created comprehensive `docs/jetson-xavier-install.md` with full installation gui
 
 Removed GPU support and `/api/transcribe` endpoint to simplify to CPU-only configuration:
 
-1. **app.py** - Hardcoded CPU defaults: `model_size="base"`, `device="cpu"`, `compute_type="int8"`
+1. **app.py** - Hardcoded CPU defaults: `device="cpu"`, `compute_type="int8"`
 2. **fastapi_app.py** - Removed `/api/transcribe` endpoint
 3. **test_api.py** - Removed 3 tests for `/api/transcribe`
 4. **docs/jetson-xavier-install.md** - Deleted (GPU deployment no longer supported)
@@ -122,6 +122,28 @@ Removed GPU support and `/api/transcribe` endpoint to simplify to CPU-only confi
 - Simplifies deployment and maintenance
 - App now runs on any CPU-based host without GPU configuration
 - WebSocket streaming (`/api/stream`) remains for real-time transcription
+
+## Model Upgrade (2026-02-03)
+
+Changed model from `base` to `large-v3` for better transcription accuracy.
+
+- E2E test server timeout increased from 3s to 120s to allow for model loading
+
+## Document Name Bug Fix (2026-02-03)
+
+### Problem
+
+After transcription, the document name was reset to "Untitled document" because the `/transcribe` endpoint wasn't preserving the document name and ID when returning the editor fragment.
+
+### Solution
+
+- **Server**: `/transcribe` endpoint now accepts `documentName` and `documentId` form parameters and passes them to `render_editor`
+- **Client**: `transcribeAccumulated()` now includes `documentName` and `documentId` in form data
+
+### Tests Added
+
+- Integration test: `test_transcribe_htmx_preserves_document_name`
+- E2E test: `test_transcription_preserves_document_name`
 
 ## Next Steps
 
