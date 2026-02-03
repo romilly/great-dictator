@@ -17,7 +17,7 @@ db_dir = Path(db_path).parent
 db_dir.mkdir(parents=True, exist_ok=True)
 
 transcriber = WhisperTranscriber(
-    model_size="base",
+    model_size="large-v3",
     device="cpu",
     compute_type="int8",
 )
