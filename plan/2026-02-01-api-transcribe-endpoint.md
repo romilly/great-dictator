@@ -105,6 +105,24 @@ cd python && pip install . --no-build-isolation
 
 Created comprehensive `docs/jetson-xavier-install.md` with full installation guide and troubleshooting.
 
+## Simplification (2026-02-03)
+
+### Changes Made
+
+Removed GPU support and `/api/transcribe` endpoint to simplify to CPU-only configuration:
+
+1. **app.py** - Hardcoded CPU defaults: `model_size="base"`, `device="cpu"`, `compute_type="int8"`
+2. **fastapi_app.py** - Removed `/api/transcribe` endpoint
+3. **test_api.py** - Removed 3 tests for `/api/transcribe`
+4. **docs/jetson-xavier-install.md** - Deleted (GPU deployment no longer supported)
+5. **tests/e2e/conftest.py** - Removed environment variable overrides
+
+### Rationale
+
+- Simplifies deployment and maintenance
+- App now runs on any CPU-based host without GPU configuration
+- WebSocket streaming (`/api/stream`) remains for real-time transcription
+
 ## Next Steps
 
 - Consider `asyncio.to_thread()` for non-blocking transcription

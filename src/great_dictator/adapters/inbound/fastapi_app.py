@@ -10,8 +10,8 @@ try:
 except ImportError:
     from typing_extensions import Annotated
 
-from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile, WebSocket
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile, WebSocket
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
 from great_dictator.adapters.inbound.templates import render_document_list, render_editor
@@ -104,18 +104,6 @@ def create_app(
 
         # Otherwise return just the text (backward compatible)
         return result.text
-
-    @app.post("/api/transcribe")
-    async def api_transcribe(request: Request) -> JSONResponse:
-        content_type = request.headers.get("content-type", "")
-        if not content_type.startswith("audio/wav"):
-            raise HTTPException(status_code=400, detail="Content-Type must be audio/wav")
-        audio_bytes = await request.body()
-        try:
-            result = transcription_service.transcribe(BytesIO(audio_bytes))
-        except RuntimeError:
-            raise HTTPException(status_code=503, detail="Transcriber unavailable")
-        return JSONResponse(content={"text": result.text})
 
     @app.websocket("/api/stream")
     async def stream_transcribe(websocket: WebSocket) -> None:
