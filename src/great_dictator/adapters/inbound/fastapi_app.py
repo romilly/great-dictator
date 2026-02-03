@@ -92,6 +92,8 @@ def create_app(
     async def transcribe(
         audio: UploadFile = File(...),
         existingContent: Annotated[str, Form()] = "",
+        documentName: Annotated[str, Form()] = "Untitled document",
+        documentId: Annotated[str, Form()] = "",
         hx_request: Annotated[Optional[str], Header(alias="HX-Request")] = None,
     ) -> str:
         audio_bytes = await audio.read()
@@ -100,7 +102,13 @@ def create_app(
         # If htmx request, return editor fragment with combined content
         if hx_request:
             combined_content = existingContent + result.text
-            return render_editor(content=combined_content, status="Transcribed")
+            doc_id = int(documentId) if documentId else None
+            return render_editor(
+                document_id=doc_id,
+                document_name=documentName,
+                content=combined_content,
+                status="Transcribed",
+            )
 
         # Otherwise return just the text (backward compatible)
         return result.text

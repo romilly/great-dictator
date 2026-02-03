@@ -308,10 +308,14 @@
         async function transcribeAccumulated() {
             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
             const existingContent = document.getElementById('transcription').value;
+            const documentName = document.getElementById('docName').value;
+            const documentId = document.getElementById('documentId').value;
 
             const formData = new FormData();
             formData.append('audio', audioBlob, 'recording.webm');
             formData.append('existingContent', existingContent);
+            formData.append('documentName', documentName);
+            formData.append('documentId', documentId);
 
             // Use fetch for file upload (htmx.ajax doesn't handle FormData with files)
             const response = await fetch('/transcribe', {

@@ -55,3 +55,27 @@ def test_transcribe_htmx_returns_editor_fragment(client, fake_transcriber):
     assert_that(response.text, contains_string("Previous text."))
     assert_that(response.text, contains_string("fake transcription"))
     assert_that(response.text, contains_string('id="transcription"'))
+
+
+def test_transcribe_htmx_preserves_document_name(client, fake_transcriber):
+    """Transcribe with htmx preserves document name and id in returned fragment."""
+    audio_content = b"fake audio data"
+    files = {"audio": ("test.webm", audio_content, "audio/webm")}
+    data = {
+        "existingContent": "Some text. ",
+        "documentName": "My Meeting Notes",
+        "documentId": "42",
+    }
+
+    response = client.post(
+        "/transcribe",
+        files=files,
+        data=data,
+        headers={"HX-Request": "true"},
+    )
+
+    assert_that(response.status_code, equal_to(200))
+    # Document name should be preserved in the input field
+    assert_that(response.text, contains_string('value="My Meeting Notes"'))
+    # Document ID should be preserved in the hidden field
+    assert_that(response.text, contains_string('value="42"'))

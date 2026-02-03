@@ -28,8 +28,12 @@ def clear_test_database() -> None:
         conn.close()
 
 
-def wait_for_server(url: str, max_attempts: int = 30):
-    """Poll until server is ready."""
+def wait_for_server(url: str, max_attempts: int = 1200):
+    """Poll until server is ready.
+
+    Default timeout is 120 seconds (1200 attempts * 0.1s) to allow
+    for Whisper model loading on CPU.
+    """
     for _ in range(max_attempts):
         try:
             urlopen(url, timeout=1)

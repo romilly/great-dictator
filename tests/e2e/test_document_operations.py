@@ -5,6 +5,7 @@ from tests.e2e.conftest import (
     click_menu_item,
     wait_for_document_cleared,
     wait_for_document_saved,
+    wait_for_mic,
 )
 
 
@@ -63,3 +64,25 @@ def test_save_then_clear_then_save_creates_new_document(loaded_page: Page) -> No
     second_doc_id = loaded_page.locator("#documentId").input_value()
 
     assert first_doc_id != second_doc_id, "Clear then Save should create a new document"
+
+
+def test_transcription_preserves_document_name(loaded_page: Page) -> None:
+    """Document name should be preserved after transcription replaces editor content."""
+    wait_for_mic(loaded_page)
+
+    # Set a custom document name
+    loaded_page.locator("#docName").fill("My Meeting Notes")
+
+    # Start recording
+    loaded_page.click("#record")
+    expect(loaded_page.locator("#status")).to_contain_text("Recording", timeout=5000)
+
+    # Record for a moment then stop
+    loaded_page.wait_for_timeout(1000)
+    loaded_page.click("#stop")
+
+    # Wait for transcription to appear (status changes to "Transcribed")
+    expect(loaded_page.locator("#status")).to_contain_text("Transcribed", timeout=30000)
+
+    # Document name should still be "My Meeting Notes", not reset to "Untitled document"
+    expect(loaded_page.locator("#docName")).to_have_value("My Meeting Notes")
